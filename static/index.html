@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+
+<script src="/js/jquery.js"></script>
+<script src="/js/jquery-ui.js"></script>
+<script src="/js/coffee-script.js"></script>
+<link rel="stylesheet" href="/css/bootstrap.min.css">
+<script src="/js/bootstrap.min.js"></script>
+<link rel="stylesheet" href="http://code.jquery.com/ui/1.9.1/themes/base/jquery-ui.css" />
+
+<!--<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.4/leaflet.css" />
+<script src="http://cdn.leafletjs.com/leaflet-0.4/leaflet.js"></script> -->
+
+<!-- <script src="js/openlayers/OpenLayers.js"></script> -->
+<script src="/js/modestmaps.min.js"></script>
+
+<!-- <script src="js/dygraph-combined.js"></script>
+<script src="js/dygraphs/dygraph-dev.js"></script> -->
+<script src="/js/d3.min.js"></script> 
+<script src="/js/d3.layout.min.js"></script> 
+<script src="/js/rickshaw.js"></script> 
+<link rel="stylesheet" href="/js/rickshaw.min.css" />
+
+<script src="js/jquery.gridster.js"></script> 
+<link rel="stylesheet" href="/js/jquery.gridster.css" />
+
+<script src="js/jquery.powertip.js"></script> 
+<link rel="stylesheet" href="/js/jquery.powertip.css" />
+
+<link rel="stylesheet" href="/css/trusas.css" />
+<script type="text/coffeescript" src="/js/trusas.core.coffee"></script>
+<script type="text/coffeescript" src="/js/trusas.plugins.coffee"></script>
+<script type="text/coffeescript" src="/js/trusas.ui.coffee"></script>
+
+<!-- <script type="text/javascript" src="/js/trusas.core.js"></script>
+<script type="text/javascript" src="/js/trusas.plugins.js"></script>
+<script type="text/javascript" src="/js/trusas.ui.js"></script> -->
+
+
+<script type="text/coffeescript">
+
+$ ->
+	$("#trusas_logo").powerTip(
+		placement: 'w',
+		mouseOnToPopup: true,
+		smartPlacement: true
+		)
+	
+	tp = trusas_plugins
+	speed = tp.signal_plotter
+		typefilter: (type) ->
+			type._subtype == 'vnd.trusas.android-location'
+		field: 'mSpeed'
+		transform: (x) -> x*3.6
+	
+	trusas_create_ui
+		handlers: [].concat(tp.defaults)
+		
+		
+	
+</script>
+
+</head>
+<body>
+
+<!-- OMG! A TABLE!!=!!? -->
+<table id="playback_control" >
+<tr>
+	<td>
+		<a href="#" class="play_toggle"><img src="/img/play.svg" />
+		</a>
+	</td>
+	<td class="seek_cell">
+		<div class="seekbar"></div>
+	</td>
+	
+	<td class="session_date">
+		<span id="current"></span>
+		<!--/<span id="total"></span>-->
+	</td>
+
+</tr>
+</table>
+
+
+<div id="content" class="gridster">
+
+<ul></ul>
+</div>
+
+<div id="trusas_logo_container">
+<img id="trusas_logo" data-powertiptarget="trusas_logo_blurb" src="/img/trusas.svg" />
+<div id="trusas_logo_blurb" style="display: none">
+<p>
+Hello there! I'm called
+<strong><abbr title="I've been told that my name is a (IMO quite stupid) Finnish pun about my origins and species. There are rumors that it may be also an acronym, but I've never heard what it consists of.">Trusas</abbr></strong>
+and I was born in
+<a href="http://helsinki.fi/university/" target="_blank">University of Helsinki</a>,
+somewhere between
+<a href="http://www.helsinki.fi/tru/" target="_blank">Traffic Research Unit</a>
+and <a href="http://www.helsinki.fi/kognitiotiede/english/" target="_blank">Cognitive Science</a>.
+Though I definitely wouldn't be here without a multitude of Free and Open Source software projects.
+</p>
+<p>
+I like to help with collecting and displaying all sorts of data, and my favorite
+thing is grabbing various different data sources together with my handy tentacles.
+</p>
+</div>
+</div>
+</body>
+</html>
