@@ -59,9 +59,11 @@ $ ->
 			type._subtype == 'vnd.trusas.tru.smarteye'
 		field: 'g_est_heading'
 		redraw_interval: 1000
+		drawPoints: true
+		strokeWidth: 0.0
 	
 	trusas_create_ui
-		handlers: [speed, g_heading].concat(tp.defaults)
+		handlers: [].concat(tp.defaults, [speed, g_heading])
 	
 </script>
 
