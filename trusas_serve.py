@@ -20,11 +20,18 @@ def _prober_video(f, d):
 		'application/vnd.trusas.timemap') 
 	yield AuxProvider(vid, ('timemap', sync))
 
-
 def _prober_location(f, d):
-	#if path.basename('location_android.jsons': return
+	_basename_filter('location.jsons', f)
+	yield FileProvider(f, 'application/vnd.trusas.location')
+
+def _prober_androidlocation(f, d):
 	_basename_filter('location_android.jsons', f)
 	yield FileProvider(f, 'application/vnd.trusas.android-location')
+
+def _prober_smarteye(f, d):
+	_basename_filter('smarteye.jsons', f)
+	yield FileProvider(f, 'application/vnd.trusas.tru.smarteye')
+
 
 
 def probe_trusas_spec(directory):

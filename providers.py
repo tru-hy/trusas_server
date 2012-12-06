@@ -81,6 +81,7 @@ class AnnotationProvider(FileProvider):
 			content_type="application/vnd.trusas.annotations"):
 		super(AnnotationProvider, self).__init__(
 			os.path.join(directory, filename),
+			content_type=content_type,
 			must_be_readable=False)
 
 		if not os.path.exists(self.filepath):

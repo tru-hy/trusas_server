@@ -77,10 +77,10 @@ tp.defaults.push tp.video
 
 tp.signal_plotter = (opts) ->
 	handler = (ctrl, register, param) ->
-		{uri, type} = param
+		{uri, type, getcontainer} = param
 		return if not opts.typefilter(type)
 		
-		getJsonStream uri, (data) ->
+		create_widget = (param, data, parent) ->
 			transform = opts.transform ? (y) -> y
 			d = []
 			for row in data
@@ -88,9 +88,14 @@ tp.signal_plotter = (opts) ->
 					x: row[0].ts
 					y: transform(row[1][opts.field])
 			
-			el = $ """<div width="100%" height="100%" class="trusas-signal"></div>"""
+			html = """<div width="100%" height="100%" class="trusas-signal"></div>"""
+			$parent = $(parent)
+			$parent.html(html)
+			$el = $parent.children().first()
+			el = $el[0]
+			
 			graph = new Rickshaw.Graph(
-				element: el.get(0)
+				element: el
 				series: [
 					{color: opts.color ? 'steelblue', data: d}
 					],
@@ -100,29 +105,42 @@ tp.signal_plotter = (opts) ->
 			x_axis = new Rickshaw.Graph.Axis.Time(graph: graph)
 			y_axis = new Rickshaw.Graph.Axis.Y(graph: graph)
 			
-			rendered = false
 			graph.onUpdate(-> rendered = true)
 			render = ->
-				p = el.parent()
+				p = $parent
 				graph.configure
 					width: p.width()
 					height: p.height()
 				graph.render()
-	
-			el.on "containerresize", -> setTimeout render, 300
-
-			# A hack to "make sure" that the stuff renders
-			setTimeout render, 1000
+			
+			# A stupid hack around the seemingly stupid
+			# behavior of resize not triggering when something hacky
+			# like gridster (implicitly) resizes the container
+			resize_poll_time = 300
+			(->
+				if $el.width() != graph.width or $el.height() != graph.height
+					render()
+				setTimeout arguments.callee, resize_poll_time
+			)()
 				
+
+			$parent.load -> render
+
 			$(ctrl).on "timeupdate", ->
 				time = ctrl.getCurrentTime()
 				graph.window.xMin = time-60
 				graph.window.xMax = time
-				# Rickshaw freaks out if it's updated before render
-				if rendered then graph.update()
+				graph.update()
 
 		
 			register(param, el)
+		
+		getcontainer
+			width: 5
+			height: 1
+			callback: (parent) ->
+				getJsonStream uri, (data) ->
+					create_widget param, data, parent
 
 		return true
 

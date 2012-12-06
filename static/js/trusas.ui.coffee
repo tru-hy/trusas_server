@@ -56,8 +56,7 @@
 		container.find('.ui-resizable-handle').hover(
 			-> gridster.disable(),
 			-> gridster.enable())
-
-
+		
 	opts.complete = initialize_grid
 	opts.getcontainer = provide_container
 	ctrl = new_trusas_controller opts
