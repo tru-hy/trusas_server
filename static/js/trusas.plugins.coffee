@@ -228,7 +228,11 @@ tp.map = (opts={}) ->
 				'http://tiles.kartat.kapsi.fi/ortokuva/{z}/{x}/{y}.jpg',
 				{ maxZoom: 19 }
 				).addTo(map)
-
+			
+			L.tileLayer(
+				'http://a3.acetate.geoiq.com/tiles/acetate-roads/{z}/{x}/{y}.png',
+				{ opacity: 0.8 }
+				).addTo(map)
 
 			map.route_interp = [
 				interp1d(route_times, r[0] for r in route),
