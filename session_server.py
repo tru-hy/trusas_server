@@ -8,8 +8,8 @@ def is_fileobject(obj):
 	has = lambda attr: hasattr(obj, h) and callable(getattr(obj, h))
 	return has('read') and has('seek')
 
+DEFAULT_STATIC_PATH = path.join(path.dirname('__file__'), 'static')
 class SessionServer(object):
-	DEFAULT_STATIC_PATH = path.join(path.dirname('__file__'), 'static')
 	def __init__(self, providers, static_path=DEFAULT_STATIC_PATH):
 		self.providers = providers
 		self.static_path = path.abspath(static_path)
@@ -52,14 +52,62 @@ class SessionServer(object):
 			raise cp.HTTPError(400, "Bad Request. I'm on to you and your slashes and dots!")
 		return serve_file(path)
 
+cp_global_config = {
+	'server.socket_host': '0.0.0.0',
+	'server.thread_pool': 100,
+	'tools.sessions.locking': 'explicit'}
+
+cp_app_config = {'/': {
+	'tools.staticdir.on': True,
+	'tools.staticdir.dir': path.abspath(DEFAULT_STATIC_PATH)}
+	}
+		
+
+class Lister:
+	def __init__(self):
+		self.services = []
+
+	@cp.expose
+	def index(self):
+		page = "<html><ul>"
+		for name in sorted(self.services):
+			page += '<li><a href="%s/">%s</a></li>'%(name, name)
+		page += "</ul>"
+		return page
+	
+	@cp.expose
+	def default(self):
+		return "vittu"
+		
+
+def run_dir_prober(directory, prober):
+	main = prober(directory)
+	if len(main) > 0:
+		return run_with_providers(main)
+	
+	l = Lister()
+	cp.tree.mount(l, '/', cp_app_config)
+	cp._global_conf_alias.update(cp_global_config)
+	for reld in os.listdir(directory):
+		d = os.path.join(directory, reld)
+		if not os.path.isdir(d): continue
+		try:
+			prov = prober(d)
+		except OSError:
+			continue
+		if len(prov) == 0: continue
+		s = SessionServer(prov)
+		l.services.append(reld)
+		cp.tree.mount(s, "/"+reld)
+	
+	if hasattr(cp.engine, "signal_handler"):
+		cp.engine.signal_handler.subscribe()
+	if hasattr(cp.engine, "console_control_handler"):
+		cp.engine.console_control_handler.subscribe()
+	cp.engine.start()
+	cp.engine.block()
+
 def run_with_providers(providers):
-
-	config = {
-			'server.socket_host': '0.0.0.0',
-			'server.thread_pool': 100,
-			'tools.sessions.locking': 'explicit'
-			}
-
 	cp.quickstart(SessionServer(providers), '/',
-		config={'global': config})
+		config={'global': cp_global_config})
 	

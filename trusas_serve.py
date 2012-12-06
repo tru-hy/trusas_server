@@ -46,5 +46,4 @@ def probe_trusas_spec(directory):
 if __name__ == '__main__':
 	import sys
 	import session_server as session_server
-	session_server.run_with_providers(
-		probe_trusas_spec(sys.argv[1]))
+	session_server.run_dir_prober(sys.argv[1], probe_trusas_spec)
