@@ -1,3 +1,6 @@
+# TODO: Lot's of copypaste going on, create
+#	a generic helper for common plugin cases
+
 @trusas_plugins = {}
 tp = @trusas_plugins
 tp.defaults = []
@@ -172,13 +175,13 @@ tp.faster_signal_plotter = (opts) ->
 				setTimeout arguments.callee, resize_poll_time
 			)()
 
-			register(param, el)
 			
 			redraw_interval = opts.redraw_interval ? 0
 			graph.redraw_pending = false
+			graph.window_len = 60
 			$(ctrl).on "timeupdate", ->
 				time = ctrl.getCurrentSessionTime()
-				graph.pendingWindow = [time-60, time]
+				graph.pendingWindow = [time-graph.window_len, time]
 				#graph.updateOptions
 				#	dateWindow: [time-60, time]
 				#, true
@@ -190,6 +193,8 @@ tp.faster_signal_plotter = (opts) ->
 						graph.redraw_pending = false
 						
 					, redraw_interval
+			
+			register(param, el)
 				
 		getcontainer
 				width: 5
@@ -198,6 +203,77 @@ tp.faster_signal_plotter = (opts) ->
 					getJsonStream uri, (data) ->
 						create_widget param, data, parent
 		return true
+
+tp.map = (opts={}) ->
+	(ctrl, register, param) ->
+		{uri, type, getcontainer} = param
+		return if type._subtype != 'vnd.trusas.location'
+		create_widget = (param, data, parent) ->
+			html = """<div style="" width="100%" height="100%" class="trusas-map"></div>"""
+			$parent = $(parent)
+			$parent.html(html)
+			$el = $parent.children().first()
+			el = $el[0]
+
+			route = []
+			route_times = []
+			for d in data
+				[hdr, d] = d
+				route_times.push hdr.ts
+				route.push [d.latitude, d.longitude]
+			
+			map = L.map(el)
+			# TODO: Make configurable
+			L.tileLayer(
+				'http://tiles.kartat.kapsi.fi/ortokuva/{z}/{x}/{y}.jpg',
+				{ maxZoom: 19 }
+				).addTo(map)
+
+
+			map.route_interp = [
+				interp1d(route_times, r[0] for r in route),
+				interp1d(route_times, r[1] for r in route)
+				]
+
+			map.setView(route[0], 16)
+			set_current_pos = (pos) ->
+				map.panTo(pos)
+				map.current_marker.setLatLng(pos)
+
+			L.polyline(route, {weight: 2}).addTo(map)
+			map.current_marker = L.marker(route[0])
+			map.current_marker.addTo(map)
+
+			# A stupid hack around the seemingly stupid
+			# behavior of resize not triggering when something hacky
+			# like gridster (implicitly) resizes the container
+			resize_poll_time = 300
+			setTimeout ->
+				[mw, mh] = map.getSize()
+				if $el.width() != mw or $el.height() != mh
+					map.invalidateSize()
+				setTimeout arguments.callee, resize_poll_time
+			, 0
+			
+			$(ctrl).on "timeupdate", ->
+				t = ctrl.getCurrentSessionTime()
+				latlon = [map.route_interp[0](t), map.route_interp[1](t)]
+				set_current_pos latlon
+
+			register(param, el)
+
+		
+		getcontainer
+				width: 3
+				height: 3
+				callback: (parent) ->
+					getJsonStream uri, (data) ->
+						create_widget param, data, parent
+
+		return true
+
+tp.default_map = tp.map()
+tp.defaults.push tp.default_map
 
 json_stream_to_array = (stream) ->
 	json = []

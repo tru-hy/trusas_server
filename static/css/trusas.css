@@ -103,7 +103,13 @@ body
 	opacity: 1.0;
 }
 
-.gridster li > video
+.gridster > ul > li > video
+{
+	width: 100%;
+	height: 100%;
+}
+
+.gridster .trusas-map
 {
 	width: 100%;
 	height: 100%;

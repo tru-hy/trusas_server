@@ -9,8 +9,8 @@
 <script src="/js/bootstrap.min.js"></script>
 <link rel="stylesheet" href="http://code.jquery.com/ui/1.9.1/themes/base/jquery-ui.css" />
 
-<!--<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.4/leaflet.css" />
-<script src="http://cdn.leafletjs.com/leaflet-0.4/leaflet.js"></script> -->
+<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.4.5/leaflet.css" />
+<script src="http://cdn.leafletjs.com/leaflet-0.4.5/leaflet.js"></script>
 
 <!-- <script src="js/openlayers/OpenLayers.js"></script> -->
 <script src="/js/modestmaps.min.js"></script>
@@ -48,11 +48,13 @@ $ ->
 		)
 	
 	tp = trusas_plugins
+	extras = []
 	speed = tp.faster_signal_plotter
 		typefilter: (type) ->
 			type._subtype == 'vnd.trusas.location'
 		field: 'speed'
 		transform: (x) -> x*3.6
+	extras.push speed
 	
 	g_heading = tp.faster_signal_plotter
 		typefilter: (type) ->
@@ -61,9 +63,10 @@ $ ->
 		redraw_interval: 1000
 		drawPoints: true
 		strokeWidth: 0.0
+	#extras.push g_heading
 	
 	trusas_create_ui
-		handlers: [].concat(tp.defaults, [speed, g_heading])
+		handlers: [].concat(tp.defaults, extras)
 	
 </script>
 
