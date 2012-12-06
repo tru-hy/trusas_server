@@ -67,6 +67,8 @@ $ ->
 	
 	trusas_create_ui
 		handlers: [].concat(tp.defaults, extras)
+		uiready: ->
+			$("#trusas-loadingscreen").fadeOut()
 	
 </script>
 
@@ -117,6 +119,14 @@ I like to help with collecting and displaying all sorts of data, and my favorite
 thing is grabbing various different data sources together with my handy tentacles.
 </p>
 </div>
+</div>
+
+<div id="trusas-loadingscreen">
+	<div>
+		<img src="/img/trusas.svg" />
+		<h3>Loading data</h3>
+		<p>(If this takes more than a minute, something is wrong.)</p>
+	</div>
 </div>
 </body>
 </html>

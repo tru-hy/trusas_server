@@ -56,6 +56,8 @@
 		container.find('.ui-resizable-handle').hover(
 			-> gridster.disable(),
 			-> gridster.enable())
+
+		opts.uiready?()
 		
 	opts.complete = initialize_grid
 	opts.getcontainer = provide_container
