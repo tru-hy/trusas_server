@@ -71,6 +71,10 @@
 			change: (ev, ui) ->
 				$("#playback_control .session_date #current").html(
 					format_time(ui.value))
+				t = ctrl.toSessionTime(ui.value)
+				content = handleTipContent t
+				handle.data "powertip", content
+				$("#powerTip").html(content)
 	
 	$ctrl = $(ctrl)
 	$ctrl.on "durationchange", (e) ->
@@ -78,10 +82,106 @@
 		$("#playback_control .session_date #total").html(
 				format_time(ctrl.getDuration())
 				)
-
-	$ctrl.on "timeupdate", (e) ->
-		seekbar.slider("value", ctrl.getCurrentTime())
 	
+	format_session_time = (t) -> "#{t.toFixed(2)}s"
+
+	handle = seekbar.find(".ui-slider-handle")
+	$ctrl.on "timeupdate", (e) ->
+		t = ctrl.getCurrentTime()
+		seekbar.slider "value", t
+
+	handleTipContent = (t) ->
+		"""
+		<p>Timestamp: #{format_session_time(t)}
+		<button title="Add annotation" class="btn btn-success btn-mini pull-right add-annotation-btn">
+		+
+		</button>
+		</p>
+		"""
+	
+	handleTipOpts =
+		placement: 's'
+		mouseOnToPopup: true
+		smartPlacement: true
+		closeDelay: 500
+	
+	$("body").on "click", '.popover .annotation-form .btn-cancel', ->
+		annotid = $(@).data 'annotid'
+		annot = $ """.annotation-marker[data-annotid="#{annotid}"]"""
+		annot.popover("destroy")
+		annot.remove()
+	
+	$("body").on "click", '.popover .annotation-form .btn-success', ->
+		annotid = $(@).data 'annotid'
+		annot = $ """.annotation-marker[data-annotid="#{annotid}"]"""
+		text = $(@).parents('.annotation-form').first().find('textarea').first()
+		annot.popover("destroy")
+		annot.remove()
+		
+		###
+		annot.popover
+			trigger: 'click'
+			placement: 'bottom'
+			html: false
+			content: text.val()
+		annot.popover("show")
+		###
+	
+	add_annotation = (gtime, text) ->
+		cont = $("#playback_control #annotations")
+		pos = t/ctrl.getDuration()*100
+		
+		# A hack to find the proper elements in handlers
+		annotid = "data-annotid=\"#{Math.random()}\""
+
+		t = ctrl.toStreamTime gtime
+		title = format_session_time gtime
+
+
+	new_annotation = (t) ->
+		cont = $("#playback_control #annotations")
+		pos = t/ctrl.getDuration()*100
+		
+		# A hack to find the proper elements in handlers
+		annotid = "data-annotid=\"#{Math.random()}\""
+
+		gtime = ctrl.toSessionTime t
+		title = format_session_time gtime
+		annot = $ """
+			<li #{annotid} data-timestamp="#{gtime}"
+				title=#{title}
+				class="annotation-marker" style="left: #{pos}%"></li>
+			"""
+		
+		form = $ """
+			<div class="annotation-form">
+			<textarea>
+			</textarea>
+			<div>
+			<button #{annotid} class="btn btn-cancel">Cancel</button>
+			<button #{annotid} class="btn btn-success pull-right">Add</button>
+			</div>
+			</div>
+			"""
+		
+		textarea = form.find("textarea")
+		
+		
+		cont.append(annot)
+		annot.popover
+			trigger: 'manual'
+			placement: 'bottom'
+			html: true
+			content: form
+		annot.popover("show")
+
+
+	$("#powerTip").on "click", ".add-annotation-btn", ->
+		$.powerTip.closeTip()
+		new_annotation seekbar.slider "value"
+
+	handle.powerTip handleTipOpts
+		
 	$("#playback_control .play_toggle").click (ev) ->
 		if ctrl.isPaused()
 			ctrl.play()

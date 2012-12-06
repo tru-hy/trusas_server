@@ -98,6 +98,10 @@ class TrusasController
 	pause: (e) =>
 		@_playing = false
 		c?.pause() for c in @_controllees
+	
+	toSessionTime: (ts) => ts + @_firstTime
+
+	toStreamTime: (ts) => ts - @_firstTime
 			
 	setCurrentTime: (ts) =>
 		ts += @_firstTime

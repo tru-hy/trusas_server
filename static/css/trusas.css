@@ -136,6 +136,25 @@ body
 
 #powerTip
 {
-	width: 300px;
 	white-space: normal;
+	max-width: 300px;
+	min-width: 200px;
+	z-index: 5000
+}
+
+#annotations
+{
+	position: relative;
+	min-height: 20px;
+	margin: 0;
+	padding: 0;
+}
+.annotation-marker
+{
+	list-style-type: none;
+	position: absolute;
+	top: 5px;
+	height: 0;
+	width: 0;
+	border: 5px solid #999;
 }
