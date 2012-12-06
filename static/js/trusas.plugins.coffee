@@ -137,6 +137,12 @@ getJsonStream = (uri, success, opts={}) ->
 		success json_stream_to_array(data), args...
 	$.ajax uri, opts
 
+# TODO: This is just a temporary deadlinehack,
+#	make it a proper "plugin" too
+tp.load_annotations = (success, opts) ->
+	getJsonStream "trusas-annotations.jsons", success, opts
+		
+
 searchsorted = (needle, haystack, base=0) ->
 	# Should really use interpolation search
 	# in our cases

@@ -114,29 +114,44 @@
 	$("body").on "click", '.popover .annotation-form .btn-success', ->
 		annotid = $(@).data 'annotid'
 		annot = $ """.annotation-marker[data-annotid="#{annotid}"]"""
-		text = $(@).parents('.annotation-form').first().find('textarea').first()
+		gtime = annot.data 'timestamp'
+		text = $(@).parents('.annotation-form').first().find('textarea').first().val()
 		annot.popover("destroy")
 		annot.remove()
-		
-		###
-		annot.popover
-			trigger: 'click'
-			placement: 'bottom'
-			html: false
-			content: text.val()
-		annot.popover("show")
-		###
+
+		# TODO: NO HARDCODE!!!
+		add_uri = "trusas-annotations.jsons?action=add&ts=#{gtime}&text=#{encodeURIComponent text}"
+		$.ajax add_uri,
+			success: (data) ->
+				annot = add_annotation gtime, text
 	
 	add_annotation = (gtime, text) ->
 		cont = $("#playback_control #annotations")
+		t = ctrl.toStreamTime gtime
 		pos = t/ctrl.getDuration()*100
 		
 		# A hack to find the proper elements in handlers
 		annotid = "data-annotid=\"#{Math.random()}\""
 
-		t = ctrl.toStreamTime gtime
 		title = format_session_time gtime
-
+		
+		annot = $ """
+			<li data-timestamp="#{gtime}"
+				title=#{title}
+				class="annotation-marker" style="left: #{pos}%"></li>
+			"""
+		annot.appendTo(cont).popover
+			trigger: 'click'
+			placement: 'bottom'
+			html: false
+			content: text
+	
+	load_annotations = ->
+		$("#playback_control #annotations").html("")
+		trusas_plugins.load_annotations (annotations) ->
+			for annot in annotations
+				add_annotation annot[0]['ts'], annot[1]['text']
+	$ctrl.on "durationchange", load_annotations
 
 	new_annotation = (t) ->
 		cont = $("#playback_control #annotations")

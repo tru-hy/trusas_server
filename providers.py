@@ -2,6 +2,8 @@ import mimetypes
 from itertools import chain
 from copy import copy
 import os
+import json
+import time
 
 def add_content_type_param(ct, param):
 	return "%s; %s"%(ct, param)
@@ -10,7 +12,9 @@ class PathProvider(object):
 	def __init__(self, mypath, content_type):
 		self.mypath = mypath
 		self.content_type = content_type
-		self.provides = {self.mypath: self.content_type}
+	
+	def provides(self):
+		return {self.mypath: self.content_type}
 
 	def __call__(self, path, **kwargs):
 		if path != self.mypath:
@@ -48,17 +52,16 @@ class AuxProvider(object):
 	def __init__(self, provider, *aux_providers):
 		self.provider = provider
 		for n, p in aux_providers:
-			if len(p.provides) != 1:
+			if len(p.provides()) != 1:
 				raise ValueError("Aux provider %s (%s) doesn't provide exactly one resource."%(n, p))
 
 		self.aux_providers = aux_providers
 	
-	@property
 	def provides(self):
 		res = {}
-		main = copy(self.provider.provides)
+		main = copy(self.provider.provides())
 		for n, p in self.aux_providers[::-1]:
-			a_res = p.provides
+			a_res = p.provides()
 			res.update(a_res)
 			for k in main:
 				main[k] += "; %s=%s"%(n, a_res.keys()[0])
@@ -71,3 +74,39 @@ class AuxProvider(object):
 			res = p(*args, **kwargs)
 			if res is not None:
 				return res
+
+class AnnotationProvider(FileProvider):
+	def __init__(self, directory,
+			filename="trusas-annotations.jsons",
+			content_type="application/vnd.trusas.annotations"):
+		super(AnnotationProvider, self).__init__(
+			os.path.join(directory, filename),
+			must_be_readable=False)
+
+		if not os.path.exists(self.filepath):
+			with open(self.filepath, 'a'):
+				pass
+	
+	def handle(self, **kwargs):
+		ret = lambda: super(AnnotationProvider, self).handle()
+		if not 'action' in kwargs or kwargs['action'] != 'add':
+			return ret()
+
+		if not ('ts' in kwargs and 'text' in kwargs):
+			return ret()
+		
+		with open(self.filepath, 'a') as f:
+			annot = [
+				{'ts': float(kwargs['ts']), 'added_ts': time.time()},
+				{'text': unicode(kwargs['text'])}
+				]
+
+			# TODO: Lock the file!
+			json.dump(annot, f)
+			f.write("\n")
+		
+		return ret()
+
+		
+
+		

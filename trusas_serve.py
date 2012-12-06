@@ -1,5 +1,5 @@
 import os
-from providers import FileProvider, AuxProvider
+from providers import FileProvider, AuxProvider, AnnotationProvider
 import uuid
 
 def _basename_filter(target, path):
@@ -39,6 +39,8 @@ def probe_trusas_spec(directory):
 		for p in probers:
 			providers.extend(p(f, contents))
 	
+	if len(providers) > 0:
+		providers.append(AnnotationProvider(directory))
 	return providers
 
 if __name__ == '__main__':

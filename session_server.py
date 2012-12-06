@@ -42,7 +42,7 @@ class SessionServer(object):
 	def resources_json(self):
 		res = {}
 		for provider in self.providers[::-1]:
-			res.update(provider.provides)
+			res.update(provider.provides())
 		return res
 	
 	def serve_static(self, path):
