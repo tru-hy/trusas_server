@@ -179,9 +179,11 @@ tp.faster_signal_plotter = (opts) ->
 			redraw_interval = opts.redraw_interval ? 0
 			graph.redraw_pending = false
 			graph.window_len = 60
-			$(ctrl).on "timeupdate", ->
+
+			refresh_window = ->
 				time = ctrl.getCurrentSessionTime()
-				graph.pendingWindow = [time-graph.window_len, time]
+				graph.pendingWindow = [time-graph.window_len,
+						time+redraw_interval/1000.0]
 				#graph.updateOptions
 				#	dateWindow: [time-60, time]
 				#, true
@@ -193,7 +195,18 @@ tp.faster_signal_plotter = (opts) ->
 						graph.redraw_pending = false
 						
 					, redraw_interval
+
+			$(ctrl).on "timeupdate", refresh_window
 			
+			# TODO: This may not be the most portable thing
+			$el.on "mousewheel", (ev) ->
+				ev.preventDefault()
+				delta = ev.originalEvent.wheelDelta
+				return if not delta
+				ratio = 1 + (-delta/120.0)*0.1
+				graph.window_len *= ratio
+				refresh_window()
+							
 			register(param, el)
 				
 		getcontainer
