@@ -18,6 +18,7 @@
 			complete() if complete
 			ctrl._baseTime = ctrl._firstTime
 			$(ctrl).trigger 'timebase'
+			$(ctrl).trigger 'timeupdate'
 
 
 		notify_if_complete = ->
