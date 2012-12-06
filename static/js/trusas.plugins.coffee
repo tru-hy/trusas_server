@@ -67,7 +67,9 @@ class VideoWidget
 	getCurrentTime: =>
 		@stream_to_global @element.currentTime
 
-	setCurrentTime: (ts) => @element.currentTime = @global_to_stream ts
+	setCurrentTime: (ts) =>
+		@element.currentTime = @global_to_stream ts
+
 	getStartTime: => @stream_to_global 0.0
 	
 tp.video = VideoWidget.Load

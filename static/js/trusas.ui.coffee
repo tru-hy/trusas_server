@@ -125,6 +125,10 @@
 			success: (data) ->
 				annot = add_annotation gtime, text
 	
+	$("body").on "click", "[data-timeclick]", ->
+		t = parseFloat ctrl.toStreamTime $(@).data 'timeclick'
+		ctrl.setCurrentTime t if not isNaN t
+	
 	add_annotation = (gtime, text) ->
 		cont = $("#playback_control #annotations")
 		t = ctrl.toStreamTime gtime
@@ -135,6 +139,12 @@
 
 		title = format_session_time gtime
 		
+		content = """
+			<p>#{text}</p>
+			<button class="btn btn-success btn-mini pull-right" data-timeclick="#{gtime}">
+			Go
+			</button>
+			"""
 		annot = $ """
 			<li data-timestamp="#{gtime}"
 				title=#{title}
@@ -143,8 +153,8 @@
 		annot.appendTo(cont).popover
 			trigger: 'click'
 			placement: 'bottom'
-			html: false
-			content: text
+			html: true
+			content: content
 	
 	load_annotations = ->
 		$("#playback_control #annotations").html("")

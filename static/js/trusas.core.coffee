@@ -106,7 +106,9 @@ class TrusasController
 	setCurrentTime: (ts) =>
 		ts += @_firstTime
 		return if isNaN ts
+		@_currentTime = ts
 		c?.setCurrentTime ts for c in @_controllees
+		$(@).trigger "timeupdate"
 	
 	getCurrentTime: =>
 		t = @_currentTime - @_firstTime
