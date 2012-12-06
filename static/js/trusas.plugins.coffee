@@ -127,7 +127,7 @@ tp.signal_plotter = (opts) ->
 			$parent.load -> render
 
 			$(ctrl).on "timeupdate", ->
-				time = ctrl.getCurrentTime()
+				time = ctrl.getCurrentSessionTime()
 				graph.window.xMin = time-60
 				graph.window.xMax = time
 				graph.update()
@@ -142,6 +142,61 @@ tp.signal_plotter = (opts) ->
 				getJsonStream uri, (data) ->
 					create_widget param, data, parent
 
+		return true
+
+tp.faster_signal_plotter = (opts) ->
+	handler = (ctrl, register, param) ->
+		{uri, type, getcontainer} = param
+		return if not opts.typefilter(type)
+		create_widget = (param, data, parent) ->
+			
+			$parent = $(parent)
+			$el = $("""<div class="trusas-signal"></div>""").appendTo(parent)
+			el = $el.get(0)
+			transform = opts.transform ? (x) -> x
+			d = []
+			for row in data
+				d.push [ row[0].ts, transform(row[1][opts.field])]
+			
+			opts.interactionModel ?= {}
+			graph = new Dygraph el, d, opts
+			
+			# A stupid hack around the seemingly stupid
+			# behavior of resize not triggering when something hacky
+			# like gridster (implicitly) resizes the container
+			resize_poll_time = 300
+			(->
+				[w, h] = [$parent.width(), $parent.height()]
+				if w != graph.width_ or h != graph.height_
+					graph.resize(w, h)
+				setTimeout arguments.callee, resize_poll_time
+			)()
+
+			register(param, el)
+			
+			redraw_interval = opts.redraw_interval ? 0
+			graph.redraw_pending = false
+			$(ctrl).on "timeupdate", ->
+				time = ctrl.getCurrentSessionTime()
+				graph.pendingWindow = [time-60, time]
+				#graph.updateOptions
+				#	dateWindow: [time-60, time]
+				#, true
+
+				if not graph.redraw_pending
+					graph.redraw_pending = true
+					setTimeout ->
+						graph.updateOptions(dateWindow: graph.pendingWindow)
+						graph.redraw_pending = false
+						
+					, redraw_interval
+				
+		getcontainer
+				width: 5
+				height: 1
+				callback: (parent) ->
+					getJsonStream uri, (data) ->
+						create_widget param, data, parent
 		return true
 
 json_stream_to_array = (stream) ->
@@ -161,7 +216,7 @@ getJsonStream = (uri, success, opts={}) ->
 #	make it a proper "plugin" too
 tp.load_annotations = (success, opts) ->
 	getJsonStream "trusas-annotations.jsons", success, opts
-		
+
 
 searchsorted = (needle, haystack, base=0) ->
 	# Should really use interpolation search

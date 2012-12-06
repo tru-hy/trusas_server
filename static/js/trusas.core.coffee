@@ -114,6 +114,9 @@ class TrusasController
 		t = @_currentTime - @_firstTime
 		return 0.0 if isNaN t
 		return t
+	
+	getCurrentSessionTime: =>
+		return @toSessionTime @getCurrentTime()
 
 	getDuration: =>
 		d = (@_lastTime - @_firstTime)
