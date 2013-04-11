@@ -1,6 +1,6 @@
 # TODO: This is really ugly stuff moved from prototyping code
 @trusas_create_ui = (opts={}) ->
-	grid_size = 140
+	grid_size = 120
 	grid_margin = 10
 		
 	container = $ ".gridster ul"

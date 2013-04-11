@@ -32,6 +32,11 @@ def _prober_smarteye(f, d):
 	_basename_filter('smarteye.jsons', f)
 	yield FileProvider(f, 'application/vnd.trusas.tru.smarteye')
 
+def _prober_sensors(f, d):
+	_basename_filter('sensors.jsons', f)
+	yield FileProvider(f, 'application/vnd.trusas.sensors')
+
+
 
 
 def probe_trusas_spec(directory):

@@ -157,9 +157,19 @@ tp.faster_signal_plotter = (opts) ->
 			$el = $("""<div class="trusas-signal"></div>""").appendTo(parent)
 			el = $el.get(0)
 			transform = opts.transform ? (x) -> x
+
+			min_dt = 1.0/(opts.max_frequency ? 5)
+			
+			prev_ts = NaN
 			d = []
 			for row in data
-				d.push [ row[0].ts, transform(row[1][opts.field])]
+				val = row[1][opts.field]
+				continue if isNaN(val)
+				ts = row[0].ts
+
+				continue if not isNaN(prev_ts) and (ts - prev_ts) < min_dt
+				prev_ts = ts
+				d.push [ ts, transform(row[1][opts.field])]
 			
 			opts.interactionModel ?= {}
 			graph = new Dygraph el, d, opts
