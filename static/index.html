@@ -37,55 +37,14 @@
 <script type="text/javascript" src="js/trusas.plugins.js"></script>
 <script type="text/javascript" src="js/trusas.ui.js"></script> -->
 
-
+<script type="text/coffeescript" src="trusas.config.coffee"></script>
 <script type="text/coffeescript">
-
 $ ->
 	$("#trusas_logo").powerTip(
 		placement: 'w',
 		mouseOnToPopup: true,
 		smartPlacement: true
 		)
-	
-	tp = trusas_plugins
-	extras = []
-	speed = tp.faster_signal_plotter
-		typefilter: (type) ->
-			type._subtype == 'vnd.trusas.location'
-		field: 'speed'
-		transform: (x) -> x*3.6
-	extras.push speed
-	
-	g_heading = tp.faster_signal_plotter
-		typefilter: (type) ->
-			type._subtype == 'vnd.trusas.tru.smarteye'
-		field: 'g_est_heading'
-		drawPoints: true
-		strokeWidth: 0.0
-	extras.push g_heading
-	
-	g_yaw_rate = tp.faster_signal_plotter
-		typefilter: (type) ->
-			type._subtype == 'vnd.trusas.sensors'
-		field: 'rot_rate_z'
-		drawPoints: false
-	extras.push g_yaw_rate
-	
-	###
-	g_accel = tp.faster_signal_plotter
-		typefilter: (type) ->
-			type._subtype == 'vnd.trusas.sensors'
-		field: 'accel_x'
-		drawPoints: false
-	extras.push g_accel
-	###
-		
-
-	trusas_create_ui
-		handlers: [].concat(tp.defaults, extras)
-		uiready: ->
-			$("#trusas-loadingscreen").fadeOut()
-	
 </script>
 
 </head>

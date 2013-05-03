@@ -74,10 +74,6 @@ class Lister:
 			page += '<li><a href="%s/">%s</a></li>'%(name, name)
 		page += "</ul>"
 		return page
-	
-	@cp.expose
-	def default(self):
-		return "vittu"
 		
 
 def run_dir_prober(directory, prober):
@@ -110,4 +106,12 @@ def run_dir_prober(directory, prober):
 def run_with_providers(providers):
 	cp.quickstart(SessionServer(providers), '/',
 		config={'global': cp_global_config})
-	
+
+if __name__ == '__main__':
+	import providers
+	import json
+	import sys
+	resources = json.load(open(sys.argv[1]))
+	provs = providers.passthrough_providers(resources,
+			os.path.dirname(sys.argv[1]))
+	run_with_providers(provs)

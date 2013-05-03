@@ -108,6 +108,14 @@ class AnnotationProvider(FileProvider):
 		
 		return ret()
 
-		
+def passthrough_providers(resources, basepath=None):
+	providers = []
+	for name, content_type in resources.iteritems():
+		if basepath:
+			filepath = os.path.join(basepath, name)
+		provider = FileProvider(filepath,
+				content_type=content_type,
+				provides=name)
+		providers.append(provider)
+	return providers
 
-		
