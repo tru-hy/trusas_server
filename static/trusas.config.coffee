@@ -3,7 +3,7 @@ extras = []
 speed = tp.faster_signal_plotter
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.location'
-	field: 'speed'
+	field: 'elevation'
 	transform: (x) -> x*3.6
 extras.push speed
 	

@@ -5,7 +5,7 @@ from cherrypy.lib.static import serve_file, serve_fileobj
 
 
 def is_fileobject(obj):
-	has = lambda attr: hasattr(obj, h) and callable(getattr(obj, h))
+	has = lambda attr: hasattr(obj, attr) and callable(getattr(obj, attr))
 	return has('read') and has('seek')
 
 DEFAULT_STATIC_PATH = path.join(path.dirname('__file__'), 'static')

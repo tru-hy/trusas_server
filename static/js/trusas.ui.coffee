@@ -42,7 +42,9 @@
 		gridster = container.gridster(
 				widget_margins: [grid_margin, grid_margin],
 				widget_base_dimensions: [grid_size, grid_size],
-				max_size_x: 10).data "gridster"
+				max_size_x: 10
+				draggable: handle: '.gridster-drag-handle'
+				).data "gridster"
 		container.find(".gs_w").resizable
 			grid: [grid_size + (grid_margin * 2), grid_size + (grid_margin * 2)],
 			animate: false,
@@ -53,6 +55,10 @@
 			stop: (event, ui) ->
 				resized = $(this)
 				setTimeout (-> resizeBlock(gridster, resized)), 300
+
+		container.find(".gs_w").each ->
+			$(@).append '<div class="gridster-drag-handle"></div>'
+
 		container.find('.ui-resizable-handle').hover(
 			-> gridster.disable(),
 			-> gridster.enable())
