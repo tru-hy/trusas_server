@@ -1,11 +1,18 @@
 tp = trusas_plugins
 extras = []
-speed = tp.faster_signal_plotter
+extras.push tp.signal_plotter
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.location'
+	axis: '_ts',
+	field: 'speed'
+	transform: (x) -> x*3.6
+
+extras.push tp.signal_plotter
+	typefilter: (type) ->
+		type._subtype == 'vnd.trusas.location'
+	axis: '_ts',
 	field: 'elevation'
 	transform: (x) -> x*3.6
-extras.push speed
 	
 g_heading = tp.faster_signal_plotter
 	typefilter: (type) ->

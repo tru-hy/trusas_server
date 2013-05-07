@@ -1,9 +1,11 @@
-# TODO: Lot's of copypaste going on, create
+# TODO: Lots of copypaste going on, create
 #	a generic helper for common plugin cases
 
 @trusas_plugins = {}
 tp = @trusas_plugins
 tp.defaults = []
+
+
 
 class VideoWidget
 	@Load: (controller, register, param) =>
@@ -52,8 +54,8 @@ class VideoWidget
 		ts = []
 		sts = []
 		for row in timemap
-				ts.push row[0]['ts']
-				sts.push row[1]['stream_ts']
+			ts.push row[0]['ts']
+			sts.push row[1]['stream_ts']
 		@stream_to_global = interp1d sts, ts
 		@global_to_stream = interp1d ts, sts
 		
@@ -78,74 +80,80 @@ class VideoWidget
 tp.video = VideoWidget.Load
 tp.defaults.push tp.video
 
-tp.signal_plotter = (opts) ->
-	handler = (ctrl, register, param) ->
-		{uri, type, getcontainer} = param
-		return if not opts.typefilter(type)
-		
-		create_widget = (param, data, parent) ->
-			transform = opts.transform ? (y) -> y
-			d = []
-			for row in data
-				d.push
-					x: row[0].ts
-					y: transform(row[1][opts.field])
-			
-			html = """<div width="100%" height="100%" class="trusas-signal"></div>"""
-			$parent = $(parent)
-			$parent.html(html)
-			$el = $parent.children().first()
-			el = $el[0]
-			
-			graph = new Rickshaw.Graph(
-				element: el
-				series: [
-					{color: opts.color ? 'steelblue', data: d}
-					],
-				renderer: opts.renderer ? 'line'
-			)
-			
-			x_axis = new Rickshaw.Graph.Axis.Time(graph: graph)
-			y_axis = new Rickshaw.Graph.Axis.Y(graph: graph)
-			
-			graph.onUpdate(-> rendered = true)
-			render = ->
-				p = $parent
-				graph.configure
-					width: p.width()
-					height: p.height()
-				graph.render()
-			
-			# A stupid hack around the seemingly stupid
-			# behavior of resize not triggering when something hacky
-			# like gridster (implicitly) resizes the container
-			resize_poll_time = 300
-			(->
-				if $el.width() != graph.width or $el.height() != graph.height
-					render()
-				setTimeout arguments.callee, resize_poll_time
-			)()
-				
+# TODO: Refactor the widget and the plot to be separate
+class SignalPlotWidget
+	constructor: (parent, data, opts) ->
+		@$el = $("""<div class="trusas-signal"></div>""").appendTo(parent)
+		@el = @$el.get(0)
+		@opts = opts
 
-			$parent.load -> render
-
-			$(ctrl).on "timeupdate", ->
-				time = ctrl.getCurrentSessionTime()
-				graph.window.xMin = time-60
-				graph.window.xMax = time
-				graph.update()
-
+		opts.interactionModel ?= {}
+		@graph = new Dygraph @el, data, @opts
+	
+	setAxisRange: (range) ->
+		@graph.updateOptions(dateWindow: range)
 		
-			register(param, el)
-		
-		getcontainer
+
+class SignalPlotWidgetFactory
+	@Handler: (opts, plotopts={}) => (ctrl, register, param) =>
+		return if not opts.typefilter(param.type)
+		new @ opts, plotopts, ctrl, register, param
+
+	constructor: (@opts, @plotopts, @ctrl, @onCreated, @param) ->
+		@param.getcontainer
 			width: 5
 			height: 1
-			callback: (parent) ->
-				getJsonStream uri, (data) ->
-					create_widget param, data, parent
+			callback: @_onParent
+	
+	_onParent: (@parent) =>
+		#getJsonStream @param.uri, @_onData
+		@ctrl.data.getJsonStreamTable @param.uri, @_onData
+	
+	_onData: (data) =>
+		min_dt = 1.0/(@opts.max_frequency ? 5)
+		transform = @opts.transform ? (x) -> x
+		
+		d = data.rows @opts.axis, @opts.field
+		if d.length == 0
+			# TODO: We could do this another way around,
+			#	or even more nicely with promises
+			$(@parent).remove()
+			@onCreated undefined
+			return
+		@data = d
+		@cursor = data.cursor(@opts.axis)
+		@cursor.accommodateAxisRange(d[0][0], d[d.length-1][0])
+		
+		@_createAndConnect()
+	
+	_createAndConnect: ->
+		widget = new SignalPlotWidget @parent, @data, @plotopts
+		$(@ctrl).on "timeupdate", =>
+			time = @ctrl.getCurrentSessionTime()
+			start = time - widget.window_len
+			console.log time, start
+			widget.setAxisRange([start, time])
+		
+		# A stupid hack around the seemingly stupid
+		# behavior of resize not triggering when something hacky
+		# like gridster (implicitly) resizes the container
+		# TODO: Make this the UI's problem to send
+		#	the resize-event
+		$parent = $(@parent)
+		resize_to_parent = ->
+			[w, h] = [$parent.width(), $parent.height()]
+			if w != widget.graph.width_ or h != widget.graph.height_
+				widget.graph.resize(w, h)
+		
+		resize_poll_time = 300
+		(=>
+			resize_to_parent()
+			setTimeout arguments.callee, resize_poll_time
+		)()
+		
+		@onCreated @el
 
-		return true
+tp.signal_plotter = SignalPlotWidgetFactory.Handler
 
 tp.faster_signal_plotter = (opts) ->
 	handler = (ctrl, register, param) ->
@@ -216,15 +224,22 @@ tp.faster_signal_plotter = (opts) ->
 				ratio = 1 + (-delta/120.0)*0.1
 				graph.window_len *= ratio
 				refresh_window()
-							
-			register(param, el)
+			
+			getDuration = -> d[d.length-1][0] - d[0][0]
+			getStartTime = -> d[0][0]
+
+			register param, el,
+				calls:
+					getDuration: getDuration
+					getStartTime: getStartTime
+					setCurrentTime: -> null
 				
 		getcontainer
-				width: 5
-				height: 1
-				callback: (parent) ->
-					getJsonStream uri, (data) ->
-						create_widget param, data, parent
+			width: 5
+			height: 1
+			callback: (parent) ->
+				getJsonStream uri, (data) ->
+					create_widget param, data, parent
 		return true
 
 tp.map = (opts={}) ->

@@ -168,7 +168,7 @@
 		trusas_plugins.load_annotations (annotations) ->
 			for annot in annotations
 				add_annotation annot[0]['ts'], annot[1]['text']
-	$ctrl.on "durationchange", load_annotations
+	#$ctrl.on "durationchange", load_annotations
 
 	new_annotation = (t) ->
 		cont = $("#playback_control #annotations")

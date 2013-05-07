@@ -1,3 +1,5 @@
+# TODO! THE CONTROL FLOW IS VERY WEIRD!!!
+
 @new_trusas_controller = (opts) ->
 	{success, getcontainer, error, complete, resources,
 	oncreated, handlers} = opts
@@ -19,6 +21,7 @@
 			ctrl._baseTime = ctrl._firstTime
 			$(ctrl).trigger 'timebase'
 			$(ctrl).trigger 'timeupdate'
+			$(ctrl).trigger 'durationchange'
 
 
 		notify_if_complete = ->
@@ -30,7 +33,7 @@
 			completion_notified = true
 			on_load_complete()
 			
-		register = (param, element, {calls, events}={}) =>
+		registerer = (param) => (element, {calls, events}={}) =>
 			loaded.push param
 			if oncreated and element
 				oncreated element, param
@@ -46,7 +49,7 @@
 					uri: uri, type: type, handler: handler,
 					getcontainer: getcontainer
 
-				if handler ctrl, register, param
+				if handler ctrl, registerer(param), param
 					loading.push param
 		
 		handlers_notified = true
@@ -60,15 +63,71 @@
 	  loader resources
 	return ctrl
 
+class TrusasCursor
+	constructor: ->
+		@$ = $(@)
+		@_axisRange = [undefined, undefined]
+		@_activePosition = undefined
+		@_activeRange = [undefined, undefined]
+		@_hoverPosition = undefined
+	
+	_activeRangeDefined: ->
+		@_activeRange[0]? and @_activeRange[1]?
+	
+	getAxisRange: => @_axisRange
+	accommodateAxisRange: (min, max) =>
+		changed = false
+		# Weird comparisons to work with undefined
+		if min? and not (min >= @_axisRange[0])
+			changed = true
+			@_axisRange[0] = min
+
+		if max? and not (max <= @_axisRange[1])
+			changed = true
+			@_axisRange[1] = max
+
+		return if not changed
+		
+		@$.trigger "axisRangeChange", [@_axisRange]
+		
+		if not @_activeRangeDefined()
+			@$.trigger "activeRangeChange",
+				[@getActiveRange()]
+
+	
+	getActivePosition: => @_activePosition
+	setActivePosition: (position) =>
+		@_activePosition = position
+		@$.trigger "activePositionChange", [position]
+	
+	getActiveRange: =>
+		[min, max] = @_activeRange[..]
+		rng = [ min ? @_axisRange[0], max ? @_axisRange[1] ]
+		return rng
+	
+	setActiveRange: (range) =>
+		@_activeRange = range
+		@$.trigger "activeRangeChange", [@_getActiveRange()]
+	
+	getHoverPosition: => @_hoverPosition
+	setHoverPosition: (position) =>
+		@_hoverPosition = position
+		$(@).trigger "hoverPositionChange", position
+
 
 class TrusasController
 	constructor: ->
+		@data = new DataManager()
+		@_cursors = {}
+
 		@_controllees = []
 		@_canplay = []
 		@_playing = false
 		@_currentTime = undefined
 		@_firstTime = undefined
 		@_lastTime = undefined
+	
+	
 
 	add_controllee: (calls, events) =>
 		c = new Controllee calls, events
@@ -76,7 +135,7 @@ class TrusasController
 		e = s + c.getDuration()
 		@_firstTime = s if not (s > @_firstTime)
 		@_lastTime = e if not (e < @_lastTime)
-
+		
 		$(c).bind "durationchange", =>
 			e = c.getStartTime() + c.getDuration()
 			@_lastTime = e if not (e <= @_lastTime)
@@ -146,11 +205,81 @@ class Controllee
 			$(src).on srcevent, (ev) =>
 				event = $this.eventmap[ev.type]
 				$this.trigger event
+
+# TODO: Find out some better library for this!
+class RecordTable
+	constructor: (@records) ->
+		@_cursors = []
+	
+	cursor: (name) ->
+		if name of @_cursors
+			return @_cursors[name]
+		cur = @_cursors[name] = new TrusasCursor()
+			
+	
+	rows: (keys...) =>
+		n = keys.length
+		rows = []
+		for rrow in @records
+			drow = []
+			for key in keys
+				drow.push rrow[key] if key of rrow
+			if drow.length == n
+				rows.push drow
+		return rows
+
+	columns: (keys...) =>
+		n = keys.length
+		rng = [0..(keys.length - 1)]
+		columns = ([] for i in rng)
+		for row in @records
+			vals = []
+			for i in rng
+				if not row.hasOwnProperty keys[i]
+					break
+				vals.push row[keys[i]]
+			continue if vals.length != n
+			columns[i].push vals[i] for i in rng
+
+		return columns
+		
+
+class DataManager
+	constructor: ->
+		# TODO: We could use Deferred or something else
+		#	non-ad-hoc
+		@datasets = {}
+	
+	getJsonStreamTable: (uri, cont) =>
+		if uri of @datasets
+			cont @datasets[uri]
+			return
+		
+		crossfilter getJsonStream uri, (data) =>
+			@datasets[uri] = new RecordTable data
+			cont @datasets[uri]
+
+getJsonStream = (uri, success, opts={}) ->
+	# TODO: Really stream
+	opts.success = (data, args...) ->
+		success json_stream_to_flat_array(data), args...
+	$.ajax uri, opts
+
+json_stream_to_flat_array = (stream) ->
+	array = []
+	for line in stream.split '\n'
+		continue if line.trim() == ''
+		row = $.parseJSON line
+		for key of row[0]
+			row[1]["_"+key] = row[0][key]
+		array.push row[1]
+	return array
 		
 
 class WidgetError extends Error
 	constructor: (@origin, @uri, @type, @reason) ->
 		super
+
 	
 mime_parse = (mime) ->
 	[type, opts...] = mime.split ';'
@@ -161,5 +290,4 @@ mime_parse = (mime) ->
 	
 	[r._type, r._subtype] = (v.trim() for v in type.split '/', 2)
 	return r
-
 
