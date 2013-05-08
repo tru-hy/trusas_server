@@ -1,6 +1,13 @@
 tp = trusas_plugins
 ts_cursor = new TrusasCursor()
 extras = []
+
+extras.push tp.map
+	typefilter: (type) ->
+		type._subtype == 'vnd.trusas.location'
+	cursor: ts_cursor
+	axis: '_ts'
+
 extras.push tp.signal_plotter
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.location'
@@ -22,7 +29,7 @@ extras.push tp.signal_plotter
 	xlabel: "Time"
 	ylabel: "Elevation (m)"
 	
-g_heading = tp.faster_signal_plotter
+g_heading = tp.signal_plotter
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.tru.smarteye'
 	field: 'g_est_heading'
@@ -30,7 +37,7 @@ g_heading = tp.faster_signal_plotter
 	strokeWidth: 0.0
 extras.push g_heading
 
-g_yaw_rate = tp.faster_signal_plotter
+g_yaw_rate = tp.signal_plotter
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.sensors'
 	field: 'rot_rate_z'

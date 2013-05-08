@@ -5,8 +5,6 @@
 tp = @trusas_plugins
 tp.defaults = []
 
-
-
 class VideoWidget
 	@Load: (controller, register, param) =>
 		{uri, type, getcontainer} = param
@@ -126,19 +124,23 @@ class SignalPlotWidgetFactory
 			if grng[0] == crng[0] and grng[0] == crng[0]
 				return
 			@opts.cursor.setActiveRange(grng)
-
+		
+		@plotopts.highlightCallback ?= (event, x, points, row, seriesName) =>
+			@opts.cursor.setHoverPosition x
+		@plotopts.unhighlightCallback ?= =>
+			@opts.cursor.setHoverPosition undefined
 
 		widget = new SignalPlotWidget @parent, @data, @plotopts
 		@opts.cursor.$.on "axisRangeChange", (ev, range) =>
+			# TODO: This should be configurable!
 			opts = axes: x: axisLabelFormatter: (v) -> v - range[0]
 			widget.graph.updateOptions opts
 
 		@opts.cursor.$.on "activeRangeChange", (ev, range) =>
 			opts = dateWindow: range
 			widget.graph.updateOptions opts
-
-		@opts.cursor.accommodateAxisRange @data[0][0], @data[@data.length-1][0]
 		
+		@opts.cursor.accommodateAxisRange @data[0][0], @data[@data.length-1][0]
 		# A stupid hack around the seemingly stupid
 		# behavior of resize not triggering when something hacky
 		# like gridster (implicitly) resizes the container
@@ -160,8 +162,115 @@ class SignalPlotWidgetFactory
 
 tp.signal_plotter = SignalPlotWidgetFactory.Handler
 
+# TODO: Refactor the widget and the tracks
+class MapWidget
+	constructor: (parent, route, opts) ->
+		$parent = @parent
+		html = """<div style="" width="100%" height="100%" class="trusas-map"></div>"""
+		$parent = $(parent)
+		$parent.html(html)
+		$el = $parent.children().first()
+		el = $el[0]
+		
+		@map = L.map(el)
+		# TODO: Make configurable
+		L.tileLayer(
+			'http://tiles.kartat.kapsi.fi/ortokuva/{z}/{x}/{y}.jpg',
+			{ maxZoom: 19 }
+			).addTo(@map)
+			
+		L.tileLayer(
+			'http://a3.acetate.geoiq.com/tiles/acetate-roads/{z}/{x}/{y}.png',
+			{ opacity: 0.8 }
+			).addTo(@map)
+		L.polyline(route,
+			weight: 2
+			color: "blue").addTo(@map)
+		@activePath = L.polyline(route,
+			color: "red",
+			weight: 4).addTo @map
 
-tp.map = (opts={}) ->
+		@hoverCursor = L.circleMarker([0, 0], radius: 5).addTo(@map)
+		
+		# TODO: Leaflet has some problems with the initial zoom
+		setTimeout =>
+			@map.fitBounds @activePath.getBounds()
+			, 300
+		
+
+class CoordinateRoute
+	constructor: (@axis, @lat, @lon) ->
+		@subpath = rangepath(@axis, @lat, @lon)
+		@coords = ([@lat[i], @lon[i]] for i in [0..@axis.length-1])
+		@coordAt = coord_interp(@axis, @lat, @lon)
+
+
+class MapWidgetFactory
+	@Handler: (opts, plotopts={}) => (ctrl, register, param) =>
+		return if not opts.typefilter(param.type)
+		new @ opts, plotopts, ctrl, register, param
+
+	constructor: (@opts, @plotopts, @ctrl, @onCreated, @param) ->
+		@param.getcontainer
+			width: 4
+			height: 4
+			callback: @_onParent
+	
+	_onParent: (@parent) =>
+		#getJsonStream @param.uri, @_onData
+		@ctrl.data.getJsonStreamTable @param.uri, @_onData
+	
+	_onData: (data) =>
+		cols = data.columns @opts.axis,
+			@opts.lat_field ? "latitude",
+			@opts.lon_field ? "longitude"
+		
+		if cols[0].length == 0
+			# TODO: We could do this another way around,
+			#	or even more nicely with promises
+			$(@parent).remove()
+			@onCreated undefined
+			return
+		
+		@route = new CoordinateRoute(cols[0], cols[1], cols[2])
+	
+		@_createAndConnect()
+	
+	_createAndConnect: ->
+		widget = new MapWidget @parent, @route.coords, @plotopts
+		$el = $(@el)
+
+		# A stupid hack around the seemingly stupid
+		# behavior of resize not triggering when something hacky
+		# like gridster (implicitly) resizes the container
+		resize_poll_time = 300
+		$parent = $(@parent)
+		setTimeout =>
+			ms = widget.map.getSize()
+			if $parent.width() != ms.x or $parent.height() != ms.y
+				widget.map.invalidateSize()
+			setTimeout arguments.callee, resize_poll_time
+			, 0
+		
+		@opts.cursor.$.on "activeRangeChange", (ev, range) =>
+			subroute = @route.subpath range...
+			widget.activePath.setLatLngs(subroute)
+			widget.map.fitBounds widget.activePath.getBounds()
+
+		@opts.cursor.$.on "hoverPositionChange", (ev, position) =>
+			latlon = @route.coordAt position
+			if isNaN latlon[0]
+				# FIXME: A hack to hide the marker
+				latlon = [0, 0]
+			widget.hoverCursor.setLatLng latlon
+		
+		@onCreated @el
+		
+		
+		
+tp.map = MapWidgetFactory.Handler
+
+tp.oldmap = (opts={}) ->
 	(ctrl, register, param) ->
 		{uri, type, getcontainer} = param
 		return if type._subtype != 'vnd.trusas.location'
@@ -233,9 +342,6 @@ tp.map = (opts={}) ->
 
 		return true
 
-tp.default_map = tp.map()
-tp.defaults.push tp.default_map
-
 json_stream_to_array = (stream) ->
 	json = []
 	for line in stream.split '\n'
@@ -267,10 +373,55 @@ searchsorted = (needle, haystack, base=0) ->
 		return searchsorted(needle, haystack[0..mid_i-1], base)
 	return searchsorted(needle, haystack[mid_i..], mid_i+base)
 
+searchsorted = (needle, haystack, base=0) ->
+	# Should really use interpolation search
+	# in our cases
+	len = haystack.length
+	if len <= 1
+		return base
+	mid_i = Math.floor(len/2)
+	mid_val = haystack[mid_i]
+	if needle < mid_val
+		return searchsorted(needle, haystack[0..mid_i-1], base)
+	return searchsorted(needle, haystack[mid_i..], mid_i+base)
+	
 interp1d = (x, y) ->
 	interp = (new_x) ->
+		if new_x < x[0]
+			return NaN
 		prev_i = searchsorted(new_x, x)
 		ratio = (new_x - x[prev_i])/(x[prev_i+1] - x[prev_i])
 		return y[prev_i]*(1 - ratio) + y[prev_i + 1]*(ratio)
 	return interp
 
+coord_interp = (dist, lat, lon) ->
+	lati = interp1d(dist, lat)
+	loni = interp1d(dist, lon)
+	interp = (new_x) ->
+		return [lati(new_x), loni(new_x)]
+	return interp
+
+
+rangepath = (dists, lats, lons) ->
+	coord_i = coord_interp(dists, lats, lons)
+	get_path = (start, end) ->
+		if start < dists[0]
+			start = dists[0]
+
+		if end > dists[-1]
+			end = dists[-1]
+		
+		first = searchsorted(start, dists) + 1
+		last = searchsorted(end, dists)
+		start = coord_i(start)
+		end = coord_i(end)
+		
+		plats = [start[0]].concat(lats[first..last]).concat([end[0]])
+		plons = [start[1]].concat(lons[first..last]).concat([end[1]])
+		coords = ([plats[i], plons[i]] for i in [0..(plats.length-1)])
+		# HACK!!! FIX THE SEARCHSORTED!!
+		last_i = coords.length - 1
+		if isNaN(coords[last_i][0])
+			coords[last_i] = [lats[lats.length - 1], lons[lons.length - 1]]
+		return coords
+	return get_path
