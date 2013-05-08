@@ -186,21 +186,29 @@ class MapWidget
 			'http://a3.acetate.geoiq.com/tiles/acetate-roads/{z}/{x}/{y}.png',
 			{ opacity: 0.8 }
 			).addTo(@map)
-		fullpath = L.polyline(route,
+		
+		# Leaflet mangles this internally!
+		route_copy = (r[..] for r in route)
+		fullpath = L.polyline(route_copy,
 			weight: 2
 			color: "blue").addTo(@map)
 	
 
-		@activePath = L.polyline(route,
+		@activePath = L.polyline(route_copy,
 			color: "red",
 			weight: 4).addTo @map
 		
 		@hoverCursor = L.circleMarker([0, 0], radius: 5).addTo(@map)
 		
 		# TODO: Leaflet has some problems with the initial zoom
-		setTimeout =>
+		#	find a nicer way
+		(=>
 			@map.fitBounds @activePath.getBounds()
-			, 300
+			if @map.getZoom() != 0
+				$(@).trigger "widgetLoaded"
+				return
+			setTimeout arguments.callee, 100
+		)()
 		
 
 class CoordinateRoute
@@ -211,6 +219,33 @@ class CoordinateRoute
 
 		if @bearing?
 			@bearingAt = interp1d(@axis, @bearing)
+	
+	getContainedSlice: (bounds) =>
+		# TODO: Find a proper library for this
+		# TODO: Take distances in constructor so we can use them
+		# TODO: Interpolate edges
+		contained = []
+		for i in [0..@coords.length-1]
+			continue if not bounds.contains @coords[i]
+			contained.push i
+		
+		current = []
+		continuous = [current]
+		for i in [0..contained.length-1]
+			if contained[i+1] - contained[i] == 1
+				current.push contained[i]
+				continue
+			current = []
+			continuous.push current
+		
+		maxlen = 0
+		winner = []
+		for span in continuous
+			if span.length > maxlen
+				winner = span
+				maxlen = span.length
+		
+		return [winner[0], winner[winner.length - 1]]
 
 
 class MapWidgetFactory
@@ -260,10 +295,19 @@ class MapWidgetFactory
 			setTimeout arguments.callee, resize_poll_time
 			, 0
 		
-		@opts.cursor.$.on "activeRangeChange", (ev, range) =>
+		# TODO: Find something more general
+		#	and async-robust for this!
+		ignoreRange = false
+		fitRange = (ev) =>
+			range = @opts.cursor.getActiveRange()
 			subroute = @route.subpath range...
 			widget.activePath.setLatLngs(subroute)
+			return if ignoreRange
 			widget.map.fitBounds widget.activePath.getBounds()
+			
+
+		@opts.cursor.$.on "activeRangeChange", fitRange
+		@opts.cursor.$.on "activePositionChange", fitRange
 
 		@opts.cursor.$.on "hoverPositionChange", (ev, position) =>
 			latlon = @route.coordAt position
@@ -271,6 +315,19 @@ class MapWidgetFactory
 				# FIXME: A hack to hide the marker
 				latlon = [0, 0]
 			widget.hoverCursor.setLatLng latlon
+		
+		updateRange = =>
+			bounds = widget.map.getBounds()
+			slice = @route.getContainedSlice bounds
+			range = [@route.axis[slice[0]], @route.axis[slice[1]]]
+			ignoreRange = true
+			@opts.cursor.setActivePosition (range[1]+range[0])/2
+			@opts.cursor.setActiveRange range
+			ignoreRange = false
+		
+		$(widget).on "widgetLoaded", ->
+			widget.map.on "drag", updateRange
+			widget.map.on "zoomend", updateRange
 		
 		@onCreated @el
 		
@@ -331,78 +388,6 @@ class StreetViewFactory
 		@onCreated @el
 
 tp.streetview = StreetViewFactory.Handler
-
-tp.oldmap = (opts={}) ->
-	(ctrl, register, param) ->
-		{uri, type, getcontainer} = param
-		return if type._subtype != 'vnd.trusas.location'
-		create_widget = (param, data, parent) ->
-			html = """<div style="" width="100%" height="100%" class="trusas-map"></div>"""
-			$parent = $(parent)
-			$parent.html(html)
-			$el = $parent.children().first()
-			el = $el[0]
-
-			route = []
-			route_times = []
-			for d in data
-				[hdr, d] = d
-				route_times.push hdr.ts
-				route.push [d.latitude, d.longitude]
-			
-			map = L.map(el)
-			# TODO: Make configurable
-			L.tileLayer(
-				'http://tiles.kartat.kapsi.fi/ortokuva/{z}/{x}/{y}.jpg',
-				{ maxZoom: 19 }
-				).addTo(map)
-			
-			L.tileLayer(
-				'http://a3.acetate.geoiq.com/tiles/acetate-roads/{z}/{x}/{y}.png',
-				{ opacity: 0.8 }
-				).addTo(map)
-
-			map.route_interp = [
-				interp1d(route_times, r[0] for r in route),
-				interp1d(route_times, r[1] for r in route)
-				]
-
-			map.setView(route[0], 16)
-			set_current_pos = (pos) ->
-				map.panTo(pos)
-				map.current_marker.setLatLng(pos)
-
-			L.polyline(route, {weight: 2}).addTo(map)
-			map.current_marker = L.marker(route[0])
-			map.current_marker.addTo(map)
-
-			# A stupid hack around the seemingly stupid
-			# behavior of resize not triggering when something hacky
-			# like gridster (implicitly) resizes the container
-			resize_poll_time = 300
-			setTimeout ->
-				[mw, mh] = map.getSize()
-				if $el.width() != mw or $el.height() != mh
-					map.invalidateSize()
-				setTimeout arguments.callee, resize_poll_time
-			, 0
-			
-			$(ctrl).on "timeupdate", ->
-				t = ctrl.getCurrentSessionTime()
-				latlon = [map.route_interp[0](t), map.route_interp[1](t)]
-				set_current_pos latlon
-
-			register(param, el)
-
-		
-		getcontainer
-				width: 3
-				height: 3
-				callback: (parent) ->
-					getJsonStream uri, (data) ->
-						create_widget param, data, parent
-
-		return true
 
 json_stream_to_array = (stream) ->
 	json = []
