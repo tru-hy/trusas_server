@@ -130,6 +130,9 @@ class SignalPlotWidgetFactory
 		@plotopts.unhighlightCallback ?= =>
 			@opts.cursor.setHoverPosition undefined
 
+		@plotopts.clickCallback ?= (ev, x, points) =>
+			@opts.cursor.setActivePosition x
+
 		widget = new SignalPlotWidget @parent, @data, @plotopts
 		@opts.cursor.$.on "axisRangeChange", (ev, range) =>
 			# TODO: This should be configurable!
@@ -183,13 +186,15 @@ class MapWidget
 			'http://a3.acetate.geoiq.com/tiles/acetate-roads/{z}/{x}/{y}.png',
 			{ opacity: 0.8 }
 			).addTo(@map)
-		L.polyline(route,
+		fullpath = L.polyline(route,
 			weight: 2
 			color: "blue").addTo(@map)
+	
+
 		@activePath = L.polyline(route,
 			color: "red",
 			weight: 4).addTo @map
-
+		
 		@hoverCursor = L.circleMarker([0, 0], radius: 5).addTo(@map)
 		
 		# TODO: Leaflet has some problems with the initial zoom
@@ -199,10 +204,13 @@ class MapWidget
 		
 
 class CoordinateRoute
-	constructor: (@axis, @lat, @lon) ->
+	constructor: (@axis, @lat, @lon, @bearing) ->
 		@subpath = rangepath(@axis, @lat, @lon)
 		@coords = ([@lat[i], @lon[i]] for i in [0..@axis.length-1])
 		@coordAt = coord_interp(@axis, @lat, @lon)
+
+		if @bearing?
+			@bearingAt = interp1d(@axis, @bearing)
 
 
 class MapWidgetFactory
@@ -269,6 +277,60 @@ class MapWidgetFactory
 		
 		
 tp.map = MapWidgetFactory.Handler
+
+class StreetViewFactory
+	@Handler: (opts, plotopts={}) => (ctrl, register, param) =>
+		return if not opts.typefilter(param.type)
+		new @ opts, plotopts, ctrl, register, param
+
+	constructor: (@opts, @plotopts, @ctrl, @onCreated, @param) ->
+		@param.getcontainer
+			width: 5
+			height: 2
+			callback: @_onParent
+	
+	_onParent: (@parent) =>
+		#getJsonStream @param.uri, @_onData
+		@ctrl.data.getJsonStreamTable @param.uri, @_onData
+	
+	_onData: (data) =>
+		cols = data.columns @opts.axis,
+			@opts.lat_field ? "latitude",
+			@opts.lon_field ? "longitude"
+			@opts.bearing_field ? "bearing"
+		
+		if cols[0].length == 0
+			# TODO: We could do this another way around,
+			#	or even more nicely with promises
+			$(@parent).remove()
+			@onCreated undefined
+			return
+		
+		@route = new CoordinateRoute cols...
+	
+		@_createAndConnect()
+	
+	_createAndConnect: ->
+		@$el = $("""<div class="widget trusas-streetview"></div>""").appendTo(@parent)
+		@el = @$el.get(0)
+
+		$el = $(@el)
+		
+		widget = new google.maps.StreetViewPanorama @el
+
+		widget.setVisible true
+
+		@opts.cursor.$.on "activePositionChange", (ev, pos) =>
+			coords = @route.coordAt pos
+			bearing = @route.bearingAt pos
+			pos = new google.maps.LatLng coords...
+			widget.setPosition pos
+			widget.setPov heading: bearing, pitch: 0
+			widget.setVisible true
+		
+		@onCreated @el
+
+tp.streetview = StreetViewFactory.Handler
 
 tp.oldmap = (opts={}) ->
 	(ctrl, register, param) ->

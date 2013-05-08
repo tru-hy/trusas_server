@@ -115,6 +115,11 @@ body
 	height: 100%;
 }
 
+.gs_w > .widget {
+	width: 100%;
+	height: 100%;
+}
+
 .gs_w .gridster-drag-handle
 {
 	display: none;
@@ -124,7 +129,10 @@ body
 	z-index: 100;
 	cursor: move;
 	font-size: large;
+	width: auto;
+	height: auto;
 }
+
 
 .gs_w .gridster-drag-handle:after
 {

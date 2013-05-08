@@ -8,6 +8,12 @@ extras.push tp.map
 	cursor: ts_cursor
 	axis: '_ts'
 
+extras.push tp.streetview
+	typefilter: (type) ->
+		type._subtype == 'vnd.trusas.location'
+	cursor: ts_cursor
+	axis: '_ts'
+
 extras.push tp.signal_plotter
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.location'
