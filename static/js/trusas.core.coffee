@@ -107,13 +107,14 @@ class TrusasCursor
 	
 	setActiveRange: (range) =>
 		@_activeRange = range
-		@$.trigger "activeRangeChange", [@_getActiveRange()]
+		@$.trigger "activeRangeChange", [@getActiveRange()]
 	
 	getHoverPosition: => @_hoverPosition
 	setHoverPosition: (position) =>
 		@_hoverPosition = position
 		$(@).trigger "hoverPositionChange", position
 
+@TrusasCursor = TrusasCursor
 
 class TrusasController
 	constructor: ->
@@ -209,13 +210,6 @@ class Controllee
 # TODO: Find out some better library for this!
 class RecordTable
 	constructor: (@records) ->
-		@_cursors = []
-	
-	cursor: (name) ->
-		if name of @_cursors
-			return @_cursors[name]
-		cur = @_cursors[name] = new TrusasCursor()
-			
 	
 	rows: (keys...) =>
 		n = keys.length
@@ -255,7 +249,7 @@ class DataManager
 			cont @datasets[uri]
 			return
 		
-		crossfilter getJsonStream uri, (data) =>
+		getJsonStream uri, (data) =>
 			@datasets[uri] = new RecordTable data
 			cont @datasets[uri]
 

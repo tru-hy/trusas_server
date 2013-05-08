@@ -86,14 +86,9 @@ class SignalPlotWidget
 		@$el = $("""<div class="trusas-signal"></div>""").appendTo(parent)
 		@el = @$el.get(0)
 		@opts = opts
-
-		opts.interactionModel ?= {}
+		@opts.showLabelsOnHighlight ?= false
 		@graph = new Dygraph @el, data, @opts
-	
-	setAxisRange: (range) ->
-		@graph.updateOptions(dateWindow: range)
 		
-
 class SignalPlotWidgetFactory
 	@Handler: (opts, plotopts={}) => (ctrl, register, param) =>
 		return if not opts.typefilter(param.type)
@@ -121,18 +116,28 @@ class SignalPlotWidgetFactory
 			@onCreated undefined
 			return
 		@data = d
-		@cursor = data.cursor(@opts.axis)
-		@cursor.accommodateAxisRange(d[0][0], d[d.length-1][0])
-		
 		@_createAndConnect()
 	
 	_createAndConnect: ->
+
+		@plotopts.drawCallback ?= (graph, is_initial) =>
+			grng = graph.xAxisRange()
+			crng = @opts.cursor.getActiveRange()
+			if grng[0] == crng[0] and grng[0] == crng[0]
+				return
+			@opts.cursor.setActiveRange(grng)
+
+
 		widget = new SignalPlotWidget @parent, @data, @plotopts
-		$(@ctrl).on "timeupdate", =>
-			time = @ctrl.getCurrentSessionTime()
-			start = time - widget.window_len
-			console.log time, start
-			widget.setAxisRange([start, time])
+		@opts.cursor.$.on "axisRangeChange", (ev, range) =>
+			opts = axes: x: axisLabelFormatter: (v) -> v - range[0]
+			widget.graph.updateOptions opts
+
+		@opts.cursor.$.on "activeRangeChange", (ev, range) =>
+			opts = dateWindow: range
+			widget.graph.updateOptions opts
+
+		@opts.cursor.accommodateAxisRange @data[0][0], @data[@data.length-1][0]
 		
 		# A stupid hack around the seemingly stupid
 		# behavior of resize not triggering when something hacky
@@ -155,92 +160,6 @@ class SignalPlotWidgetFactory
 
 tp.signal_plotter = SignalPlotWidgetFactory.Handler
 
-tp.faster_signal_plotter = (opts) ->
-	handler = (ctrl, register, param) ->
-		{uri, type, getcontainer} = param
-		return if not opts.typefilter(type)
-		create_widget = (param, data, parent) ->
-			
-			$parent = $(parent)
-			$el = $("""<div class="trusas-signal"></div>""").appendTo(parent)
-			el = $el.get(0)
-			transform = opts.transform ? (x) -> x
-
-			min_dt = 1.0/(opts.max_frequency ? 5)
-			
-			prev_ts = NaN
-			d = []
-			for row in data
-				val = row[1][opts.field]
-				continue if isNaN(val)
-				ts = row[0].ts
-
-				continue if not isNaN(prev_ts) and (ts - prev_ts) < min_dt
-				prev_ts = ts
-				d.push [ ts, transform(row[1][opts.field])]
-			
-			opts.interactionModel ?= {}
-			graph = new Dygraph el, d, opts
-			
-			# A stupid hack around the seemingly stupid
-			# behavior of resize not triggering when something hacky
-			# like gridster (implicitly) resizes the container
-			resize_poll_time = 300
-			(->
-				[w, h] = [$parent.width(), $parent.height()]
-				if w != graph.width_ or h != graph.height_
-					graph.resize(w, h)
-				setTimeout arguments.callee, resize_poll_time
-			)()
-
-			
-			redraw_interval = opts.redraw_interval ? 0
-			graph.redraw_pending = false
-			graph.window_len = 60
-
-			refresh_window = ->
-				time = ctrl.getCurrentSessionTime()
-				graph.pendingWindow = [time-graph.window_len,
-						time+redraw_interval/1000.0]
-				#graph.updateOptions
-				#	dateWindow: [time-60, time]
-				#, true
-
-				if not graph.redraw_pending
-					graph.redraw_pending = true
-					setTimeout ->
-						graph.updateOptions(dateWindow: graph.pendingWindow)
-						graph.redraw_pending = false
-						
-					, redraw_interval
-
-			$(ctrl).on "timeupdate", refresh_window
-			
-			# TODO: This may not be the most portable thing
-			$el.on "mousewheel", (ev) ->
-				ev.preventDefault()
-				delta = ev.originalEvent.wheelDelta
-				return if not delta
-				ratio = 1 + (-delta/120.0)*0.1
-				graph.window_len *= ratio
-				refresh_window()
-			
-			getDuration = -> d[d.length-1][0] - d[0][0]
-			getStartTime = -> d[0][0]
-
-			register param, el,
-				calls:
-					getDuration: getDuration
-					getStartTime: getStartTime
-					setCurrentTime: -> null
-				
-		getcontainer
-			width: 5
-			height: 1
-			callback: (parent) ->
-				getJsonStream uri, (data) ->
-					create_widget param, data, parent
-		return true
 
 tp.map = (opts={}) ->
 	(ctrl, register, param) ->

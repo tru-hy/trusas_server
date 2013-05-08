@@ -115,17 +115,25 @@ body
 	height: 100%;
 }
 
-.gs_w:hover .gridster-drag-handle
+.gs_w .gridster-drag-handle
 {
+	display: none;
 	position: absolute;
-	top: 5px;
+	top: 0;
 	right: 5px;
 	z-index: 100;
-	width: 15px;
-	height: 15px;
 	cursor: move;
-	background-color: black;
-	opacity: 0.5;
+	font-size: large;
+}
+
+.gs_w .gridster-drag-handle:after
+{
+	content: "\2194"
+}
+
+.gs_w:hover .gridster-drag-handle
+{
+	display: block;
 }
 
 #content #speed_graph

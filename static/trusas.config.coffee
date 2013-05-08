@@ -1,18 +1,26 @@
 tp = trusas_plugins
+ts_cursor = new TrusasCursor()
 extras = []
 extras.push tp.signal_plotter
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.location'
-	axis: '_ts',
+	cursor: ts_cursor
+	axis: '_ts'
 	field: 'speed'
 	transform: (x) -> x*3.6
+,
+	xlabel: "Time (s)"
+	ylabel: "Speed (km/h)"
 
 extras.push tp.signal_plotter
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.location'
-	axis: '_ts',
+	cursor: ts_cursor
+	axis: '_ts'
 	field: 'elevation'
-	transform: (x) -> x*3.6
+,
+	xlabel: "Time"
+	ylabel: "Elevation (m)"
 	
 g_heading = tp.faster_signal_plotter
 	typefilter: (type) ->
@@ -32,4 +40,5 @@ extras.push g_yaw_rate
 trusas_create_ui
 	handlers: [].concat(tp.defaults, extras)
 	uiready: ->
+		ts_cursor.$.trigger "axisRangeChange", [ts_cursor.getAxisRange()]
 		$("#trusas-loadingscreen").fadeOut()
