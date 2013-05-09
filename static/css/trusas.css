@@ -144,6 +144,18 @@ body
 	display: block;
 }
 
+.trusas-cesium > .cesium-widget
+{
+	width: 100%;
+	height: 100%;
+}
+
+.trusas-cesium > .cesium-widget > canvas
+{
+	width: 100%;
+	height: 100%;
+}
+
 #content #speed_graph
 {
 	height: 120px;

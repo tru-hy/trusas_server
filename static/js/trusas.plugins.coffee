@@ -107,6 +107,8 @@ class SignalPlotWidgetFactory
 		transform = @opts.transform ? (x) -> x
 		
 		d = data.rows @opts.axis, @opts.field
+		row[1] = transform row[1] for row in d
+			
 		if d.length == 0
 			# TODO: We could do this another way around,
 			#	or even more nicely with promises
@@ -198,6 +200,8 @@ class MapWidget
 			color: "red",
 			weight: 4).addTo @map
 		
+		@activeCursor = L.marker([0, 0]).addTo(@map)
+
 		@hoverCursor = L.circleMarker([0, 0], radius: 5).addTo(@map)
 		
 		# TODO: Leaflet has some problems with the initial zoom
@@ -212,13 +216,16 @@ class MapWidget
 		
 
 class CoordinateRoute
-	constructor: (@axis, @lat, @lon, @bearing) ->
+	constructor: (@axis, @lat, @lon, @bearing, @elevation) ->
 		@subpath = rangepath(@axis, @lat, @lon)
 		@coords = ([@lat[i], @lon[i]] for i in [0..@axis.length-1])
 		@coordAt = coord_interp(@axis, @lat, @lon)
-
+		
 		if @bearing?
+			# FIXME TODO! This is very wrong!
 			@bearingAt = interp1d(@axis, @bearing)
+		if @elevation?
+			@elevationAt = interp1d(@axis, @elevation)
 	
 	getContainedSlice: (bounds) =>
 		# TODO: Find a proper library for this
@@ -246,6 +253,8 @@ class CoordinateRoute
 				maxlen = span.length
 		
 		return [winner[0], winner[winner.length - 1]]
+	
+		
 
 
 class MapWidgetFactory
@@ -308,6 +317,9 @@ class MapWidgetFactory
 
 		@opts.cursor.$.on "activeRangeChange", fitRange
 		@opts.cursor.$.on "activePositionChange", fitRange
+		@opts.cursor.$.on "activePositionChange", (ev, pos) =>
+			latlon = @route.coordAt pos
+			widget.activeCursor.setLatLng latlon
 
 		@opts.cursor.$.on "hoverPositionChange", (ev, position) =>
 			latlon = @route.coordAt position
@@ -328,7 +340,7 @@ class MapWidgetFactory
 		$(widget).on "widgetLoaded", ->
 			widget.map.on "drag", updateRange
 			widget.map.on "zoomend", updateRange
-		
+
 		@onCreated @el
 		
 		
@@ -388,6 +400,117 @@ class StreetViewFactory
 		@onCreated @el
 
 tp.streetview = StreetViewFactory.Handler
+
+class CesiumFactory
+	@Handler: (opts, plotopts={}) => (ctrl, register, param) =>
+		return if not opts.typefilter(param.type)
+		new @ opts, plotopts, ctrl, register, param
+
+	constructor: (@opts, @plotopts, @ctrl, @onCreated, @param) ->
+		@param.getcontainer
+			width: 5
+			height: 4
+			callback: @_onParent
+	
+	_onParent: (@parent) =>
+		#getJsonStream @param.uri, @_onData
+		@ctrl.data.getJsonStreamTable @param.uri, @_onData
+	
+	_onData: (data) =>
+		cols = data.columns @opts.axis,
+			@opts.lat_field ? "latitude",
+			@opts.lon_field ? "longitude"
+			@opts.bearing_field ? "bearing"
+			@opts.elevation_field ? "elevation"
+		
+		if cols[0].length == 0
+			# TODO: We could do this another way around,
+			#	or even more nicely with promises
+			$(@parent).remove()
+			@onCreated undefined
+			return
+		
+		@route = new CoordinateRoute cols...
+	
+		@_createAndConnect()
+	
+	_createAndConnect: ->
+		@$el = $("""<div class="widget trusas-cesium"></div>""").appendTo(@parent)
+		@el = @$el.get(0)
+
+		$el = $(@el)
+		
+		osm = new Cesium.OpenStreetMapImageryProvider
+			url: 'http://tile.openstreetmap.org/'
+
+		ortopic = new Cesium.TileMapServiceImageryProvider
+			url: 'http://tiles.kartat.kapsi.fi/ortokuva/',
+			maximumLevel: 19
+		
+		terrain = new Cesium.CesiumTerrainProvider
+			url: "http://cesium.agi.com/smallterrain/"
+
+		ortopic = new Cesium.WebMapServiceImageryProvider
+			url: "http://tiles.kartat.kapsi.fi/ortokuva?"
+			layers: "ortokuva"
+			parameters:
+				format: "image/png"
+
+		widget = new Cesium.CesiumWidget @el,
+			imageryProvider: ortopic
+			#terrainProvider: terrain
+		# TODO: Seems to resize only by scaling
+		###
+		console.log widget.container
+		(=>
+			console.log widget.container.clientWidth
+			setTimeout arguments.callee, 100
+		)()
+		###
+
+		cam = widget.scene.getCamera()
+		controller = cam.controller
+		pos = @route.coords[0]
+		elev = @route.elevation[0]
+
+		cameraHeight = @opts.cameraHeight ? 40.0
+		cameraBehind = @opts.cameraBehind ? 60.0
+		
+		geod = GeographicLib.Geodesic.WGS84
+		ellipsoid = Cesium.Ellipsoid.WGS84
+		pos = Cesium.Cartographic.fromDegrees pos[1], pos[0], elev+cameraHeight
+
+		degToCartesian = (lon, lat, height) ->
+			cart = Cesium.Cartographic.fromDegrees lon, lat, height
+			return ellipsoid.cartographicToCartesian cart
+		
+		@opts.cursor.$.on "activePositionChange", (ev, pos) =>
+			# Couldn't find geodesics in Cesium
+			[lat, lon] = @route.coordAt pos
+			bearing = @route.bearingAt pos
+			origin = geod.Direct lat, lon, bearing, -cameraBehind
+			
+			#elev = @route.elevationAt pos
+			eye = degToCartesian origin.lon2, origin.lat2, cameraHeight
+			target = degToCartesian lon, lat, 0.0
+			up = ellipsoid.geodeticSurfaceNormal eye
+
+			controller.lookAt eye, target, up
+			#pos = Cesium.Cartographic.fromDegrees latlon[1], latlon[0], cameraHeight
+			#controller.setPositionCartographic pos
+			#controller.lookUp 45
+
+		polylines = new Cesium.PolylineCollection()
+		routeline = polylines.add()
+		
+		mangled = (Cesium.Cartographic.fromDegrees(p[1], p[0], 0) for p in @route.coords)
+		cart_route = ellipsoid.cartographicArrayToCartesianArray(mangled)
+		routeline.setPositions cart_route
+		widget.scene.getPrimitives().add polylines
+		
+		@onCreated @el
+
+tp.cesium = CesiumFactory.Handler
 
 json_stream_to_array = (stream) ->
 	json = []

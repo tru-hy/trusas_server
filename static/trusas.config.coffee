@@ -1,5 +1,6 @@
 tp = trusas_plugins
 ts_cursor = new TrusasCursor()
+ts_player = new TrusasCursorPlayer ts_cursor
 extras = []
 
 extras.push tp.map
@@ -8,7 +9,15 @@ extras.push tp.map
 	cursor: ts_cursor
 	axis: '_ts'
 
+###
 extras.push tp.streetview
+	typefilter: (type) ->
+		type._subtype == 'vnd.trusas.location'
+	cursor: ts_cursor
+	axis: '_ts'
+###
+
+extras.push tp.cesium
 	typefilter: (type) ->
 		type._subtype == 'vnd.trusas.location'
 	cursor: ts_cursor
@@ -55,3 +64,4 @@ trusas_create_ui
 	uiready: ->
 		ts_cursor.$.trigger "axisRangeChange", [ts_cursor.getAxisRange()]
 		$("#trusas-loadingscreen").fadeOut()
+		#ts_player.play()

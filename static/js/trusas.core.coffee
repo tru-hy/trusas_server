@@ -63,6 +63,24 @@
 	  loader resources
 	return ctrl
 
+class @TrusasCursorPlayer
+	constructor: (@cursor, @dt=0.1) ->
+		@looper = undefined
+
+	play: =>
+		return if @looper
+		if not @cursor.getActivePosition?
+			@cursor.setActivePosition @cursor.getAxisRange()[0]
+		@looper = setInterval(@_step, @dt*1000)
+	
+	_step: =>
+		next = @cursor.getActivePosition() + @dt*2
+		@cursor.setActivePosition next
+
+	pause: =>
+		clearInterval @looper
+		@looper = undefined
+
 class TrusasCursor
 	constructor: ->
 		@$ = $(@)
