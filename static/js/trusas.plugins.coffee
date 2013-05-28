@@ -85,7 +85,35 @@ class SignalPlotWidget
 		@el = @$el.get(0)
 		@opts = opts
 		@opts.showLabelsOnHighlight ?= false
+		
+		@crosshair = $('<div style="position: absolute; width: 1px; height: 100%; top: 0; background-color: rgba(0,0,0,0.5); pointer-events: none"></div>').get(0)
+		parent.append @crosshair
+		@crosshair_pos = undefined
+
+		if @opts.drawCallback?
+			cb = @opts.drawCallback
+			@opts.drawCallback = (args...) =>
+				@_updateCrosshair()
+				cb(args...)
+		else
+			@opts.drawCallback = @_updateCrosshair
+
 		@graph = new Dygraph @el, data, @opts
+		
+		@_updateCrosshair()
+		
+
+	
+	_updateCrosshair: =>
+		if not @crosshair_pos?
+			@crosshair.style.visibility = 'hidden'
+			return
+		@crosshair.style.left = @graph.toDomXCoord(@crosshair_pos) + "px"
+		@crosshair.style.visibility = 'visible'
+	
+	setCrosshairPos: (pos) =>
+		@crosshair_pos = pos
+		@_updateCrosshair()
 		
 class SignalPlotWidgetFactory
 	@Handler: (opts, plotopts={}) => (ctrl, register, param) =>
@@ -136,14 +164,17 @@ class SignalPlotWidgetFactory
 			@opts.cursor.setActivePosition x
 
 		widget = new SignalPlotWidget @parent, @data, @plotopts
-		@opts.cursor.$.on "axisRangeChange", (ev, range) =>
+		@opts.cursor.$.on "axisRangeChange", dcall (ev, range) =>
 			# TODO: This should be configurable!
 			opts = axes: x: axisLabelFormatter: (v) -> v - range[0]
 			widget.graph.updateOptions opts
 
-		@opts.cursor.$.on "activeRangeChange", (ev, range) =>
+		@opts.cursor.$.on "activeRangeChange", dcall (ev, range) =>
 			opts = dateWindow: range
 			widget.graph.updateOptions opts
+
+		@opts.cursor.$.on "activePositionChange", (ev, pos) =>
+			widget.setCrosshairPos pos
 		
 		@opts.cursor.accommodateAxisRange @data[0][0], @data[@data.length-1][0]
 		# A stupid hack around the seemingly stupid
@@ -216,14 +247,20 @@ class MapWidget
 		
 
 class CoordinateRoute
-	constructor: (@axis, @lat, @lon, @bearing, @elevation) ->
+	constructor: (@axis, @lat, @lon, @bearing, @elevation, @geod=GeographicLib.Geodesic.WGS84) ->
 		@subpath = rangepath(@axis, @lat, @lon)
 		@coords = ([@lat[i], @lon[i]] for i in [0..@axis.length-1])
+		# TODO: This should probably be done in projected space!
+		#@coord_spline = numeric.spline @axis, @coords
+		#@delta_spline = @coord_spline.diff()
+		#@bearingAt = (c) =>
+		#	[x, y] = @delta_spline.at c
+		#	return (Math.atan2 y, x)*(180/Math.PI)
+		if @bearing?
+			@bearingAt = deg_interp @axis, @bearing
+
 		@coordAt = coord_interp(@axis, @lat, @lon)
 		
-		if @bearing?
-			# FIXME TODO! This is very wrong!
-			@bearingAt = interp1d(@axis, @bearing)
 		if @elevation?
 			@elevationAt = interp1d(@axis, @elevation)
 	
@@ -315,8 +352,7 @@ class MapWidgetFactory
 			widget.map.fitBounds widget.activePath.getBounds()
 			
 
-		@opts.cursor.$.on "activeRangeChange", fitRange
-		@opts.cursor.$.on "activePositionChange", fitRange
+		@opts.cursor.$.on "activeRangeChange", dcall fitRange
 		@opts.cursor.$.on "activePositionChange", (ev, pos) =>
 			latlon = @route.coordAt pos
 			widget.activeCursor.setLatLng latlon
@@ -333,7 +369,7 @@ class MapWidgetFactory
 			slice = @route.getContainedSlice bounds
 			range = [@route.axis[slice[0]], @route.axis[slice[1]]]
 			ignoreRange = true
-			@opts.cursor.setActivePosition (range[1]+range[0])/2
+			#@opts.cursor.setActivePosition (range[1]+range[0])/2
 			@opts.cursor.setActiveRange range
 			ignoreRange = false
 		
@@ -366,7 +402,6 @@ class StreetViewFactory
 		cols = data.columns @opts.axis,
 			@opts.lat_field ? "latitude",
 			@opts.lon_field ? "longitude"
-			@opts.bearing_field ? "bearing"
 		
 		if cols[0].length == 0
 			# TODO: We could do this another way around,
@@ -419,8 +454,8 @@ class CesiumFactory
 	_onData: (data) =>
 		cols = data.columns @opts.axis,
 			@opts.lat_field ? "latitude",
-			@opts.lon_field ? "longitude"
-			@opts.bearing_field ? "bearing"
+			@opts.lon_field ? "longitude",
+			@opts.bearing_field ? "bearing",
 			@opts.elevation_field ? "elevation"
 		
 		if cols[0].length == 0
@@ -439,25 +474,68 @@ class CesiumFactory
 		@el = @$el.get(0)
 
 		$el = $(@el)
+
+		bluemarble = new Cesium.TileMapServiceImageryProvider
+			url: 'http://cesium.agi.com/blackmarble'
+			maximumLevel : 8
 		
 		osm = new Cesium.OpenStreetMapImageryProvider
 			url: 'http://tile.openstreetmap.org/'
+			maximumLevel: 12
+			
+		class MinzoomlevelDiscard
+			constructor: (@minlevel) ->
+				
+			shouldDiscardImage: (img) =>
+				src = img.src
+				parts = src.split("/")
+				z = parseInt parts[parts.length - 3]
+				discard = (z < @minlevel)
+				#return z < @minlevel
+				return discard
 
-		ortopic = new Cesium.TileMapServiceImageryProvider
-			url: 'http://tiles.kartat.kapsi.fi/ortokuva/',
-			maximumLevel: 19
+			isReady: -> true
 		
+		openaerial = new Cesium.OpenStreetMapImageryProvider
+			url: "http://otile1.mqcdn.com/tiles/1.0.0/sat/"
+			maximumLevel: 11
+		
+		ortopic = new Cesium.OpenStreetMapImageryProvider
+			url: 'http://tiles.kartat.kapsi.fi/ortokuva/'
+			maximumLevel: 19
+			tileDiscardPolicy: new MinzoomlevelDiscard 13
+
+			
+		###
 		terrain = new Cesium.CesiumTerrainProvider
 			url: "http://cesium.agi.com/smallterrain/"
+		terrain = new Cesium.VRTheWorldTerrainProvider
+			url : 'http://www.vr-theworld.com/vr-theworld/tiles1.0.0/73/'
 
+		terrain = new Cesium.ArcGisImageServerTerrainProvider
+			url :'http://elevation.arcgisonline.com/ArcGIS/rest/services/WorldElevation/DTMEllipsoidal/ImageServer'
+			token: "e7DdYy9h9Ry2aq19iaddyq63YadpSwWw7fTpMGky6RmpAT_jX4YbH4qTeR5fxJRzTJ63I0xhJuaCZZNjIReeZQ"
+		###
+		
+		###
 		ortopic = new Cesium.WebMapServiceImageryProvider
 			url: "http://tiles.kartat.kapsi.fi/ortokuva?"
 			layers: "ortokuva"
 			parameters:
 				format: "image/png"
+			tileDiscardPolicy: new OrtopicDiscard
+		###
 
-		widget = new Cesium.CesiumWidget @el,
-			imageryProvider: ortopic
+		widget = new Cesium.CesiumWidget @el
+
+		layers = widget.centralBody.getImageryLayers()
+		layers.removeAll()
+		
+		#layers.addImageryProvider osm
+		#layers.addImageryProvider openaerial
+		layers.addImageryProvider ortopic
+		#layers.add bluemarble
+
 			#terrainProvider: terrain
 		# TODO: Seems to resize only by scaling
 		###
@@ -480,10 +558,19 @@ class CesiumFactory
 		ellipsoid = Cesium.Ellipsoid.WGS84
 		pos = Cesium.Cartographic.fromDegrees pos[1], pos[0], elev+cameraHeight
 
+		
+
 		degToCartesian = (lon, lat, height) ->
 			cart = Cesium.Cartographic.fromDegrees lon, lat, height
 			return ellipsoid.cartographicToCartesian cart
 		
+		polylines = new Cesium.PolylineCollection()
+		arrowMaterial = Cesium.Material.fromType undefined, Cesium.Material.PolylineArrowType
+		positionmarker = polylines.add()
+
+		markerLength = @opts.markerLength ? 10.0
+		markerWidth = @opts.markerWidth ? 40.0
+
 		@opts.cursor.$.on "activePositionChange", (ev, pos) =>
 			# Couldn't find geodesics in Cesium
 			[lat, lon] = @route.coordAt pos
@@ -496,14 +583,34 @@ class CesiumFactory
 			up = ellipsoid.geodeticSurfaceNormal eye
 
 			controller.lookAt eye, target, up
+
+			marker_start = geod.Direct lat, lon, bearing - 15, -markerLength/2.0
+			marker_end = geod.Direct lat, lon, bearing + 15, -markerLength/2.0
+			marker_mid = geod.Direct lat, lon, bearing, + markerLength/2.0
+			marker_start = degToCartesian(marker_start.lon2, marker_start.lat2, 0)
+			marker_mid = degToCartesian(marker_mid.lon2, marker_mid.lat2, 0)
+			marker_end = degToCartesian(marker_end.lon2, marker_end.lat2, 0)
+			
+			positionmarker.setPositions [marker_start, marker_mid, marker_end]
+
 			#pos = Cesium.Cartographic.fromDegrees latlon[1], latlon[0], cameraHeight
 			#controller.setPositionCartographic pos
 			#controller.lookUp 45
 
-		polylines = new Cesium.PolylineCollection()
+		
+		
+	
 		routeline = polylines.add()
 		
-		mangled = (Cesium.Cartographic.fromDegrees(p[1], p[0], 0) for p in @route.coords)
+		newaxis = []
+		v = @route.axis[0]
+		end = @route.axis[@route.axis.length - 1]
+		while v < end
+			newaxis.push v
+			v =  v + 0.5
+
+		coords = (@route.coordAt a for a in newaxis)
+		mangled = (Cesium.Cartographic.fromDegrees(p[1], p[0], 0) for p in coords)
 		cart_route = ellipsoid.cartographicArrayToCartesianArray(mangled)
 		routeline.setPositions cart_route
 		widget.scene.getPrimitives().add polylines
@@ -569,6 +676,21 @@ coord_interp = (dist, lat, lon) ->
 	loni = interp1d(dist, lon)
 	interp = (new_x) ->
 		return [lati(new_x), loni(new_x)]
+	return interp
+
+deg_interp = (axis, angles) ->
+	units = ([Math.sin(a*(Math.PI/180)), Math.cos(a*(Math.PI/180))] for a in angles)
+	#spline = numeric.spline axis, units
+	xi = interp1d axis, (Math.sin a*(Math.PI/180) for a in angles)
+	yi = interp1d axis, (Math.cos a*(Math.PI/180) for a in angles)
+	interp = (new_a) ->
+		x = xi(new_a)
+		y = yi(new_a)
+		#res = spline.at new_a
+		#[x, y] = res
+		angle = Math.atan2 x, y
+		angle = angle*(180/Math.PI)
+		return angle
 	return interp
 
 

@@ -1,5 +1,27 @@
 # TODO! THE CONTROL FLOW IS VERY WEIRD!!!
 
+class _Lazycall
+	constructor: (@func, @timeout=300) ->
+		@pending = undefined
+
+	schedule: (args...) =>
+		if @pending?
+			@pending = args
+			return
+		@pending = args
+		console.log "Scheduling"
+		console.log @handle
+		setTimeout @_handle, @timeout
+	
+	_handle: =>
+		@func @pending...
+		@pending = undefined
+		
+@dcall = (func, timeout=300) ->
+	handler = new _Lazycall func, timeout
+	return handler.schedule
+	
+
 @new_trusas_controller = (opts) ->
 	{success, getcontainer, error, complete, resources,
 	oncreated, handlers} = opts
@@ -64,18 +86,33 @@
 	return ctrl
 
 class @TrusasCursorPlayer
-	constructor: (@cursor, @dt=0.1) ->
+	constructor: (@cursor, @dt=0.1, @rate=2) ->
 		@looper = undefined
 
+	isPlaying: =>
+		return @looper?
+
 	play: =>
-		return if @looper
+		return if @isPlaying()
 		if not @cursor.getActivePosition?
 			@cursor.setActivePosition @cursor.getAxisRange()[0]
 		@looper = setInterval(@_step, @dt*1000)
 	
 	_step: =>
-		next = @cursor.getActivePosition() + @dt*2
+		prev = @cursor.getActivePosition()
+		activerange = @cursor.getActiveRange()
+		lwidth = Math.max 0, prev - activerange[0]
+		rwidth = Math.max 0, activerange[1] - prev
+
+		next = prev + @dt*@rate
+		totalrange = @cursor.getAxisRange()
+		new_range = [
+			Math.max(totalrange[0], next - lwidth)
+			Math.min(totalrange[1], next + rwidth)
+			]
 		@cursor.setActivePosition next
+		@cursor.setActiveRange new_range
+
 
 	pause: =>
 		clearInterval @looper
@@ -124,8 +161,13 @@ class TrusasCursor
 		return rng
 	
 	setActiveRange: (range) =>
+		prev = @getActiveRange()
 		@_activeRange = range
-		@$.trigger "activeRangeChange", [@getActiveRange()]
+		new_range = @getActiveRange()
+		return if (prev[0] == new_range[0])
+		return if (prev[1] == new_range[1])
+
+		@$.trigger "activeRangeChange", [new_range]
 	
 	getHoverPosition: => @_hoverPosition
 	setHoverPosition: (position) =>

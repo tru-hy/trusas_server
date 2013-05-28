@@ -64,4 +64,8 @@ trusas_create_ui
 	uiready: ->
 		ts_cursor.$.trigger "axisRangeChange", [ts_cursor.getAxisRange()]
 		$("#trusas-loadingscreen").fadeOut()
-		#ts_player.play()
+		$("#playback_control .play_toggle").on "click", ->
+			if not ts_player.isPlaying()
+				ts_player.play()
+			else
+				ts_player.pause()
