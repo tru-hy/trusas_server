@@ -85,6 +85,9 @@ class SignalPlotWidget
 		@el = @$el.get(0)
 		@opts = opts
 		@opts.showLabelsOnHighlight ?= false
+		@opts.axisLabelFontSize ?= 12
+		@opts.xLabelHeight ?= 14
+		@opts.yLabelWidth ?= 14
 		
 		@crosshair = $('<div style="position: absolute; width: 1px; height: 100%; top: 0; background-color: rgba(0,0,0,0.5); pointer-events: none"></div>').get(0)
 		parent.append @crosshair
@@ -500,10 +503,13 @@ class CesiumFactory
 			url: "http://otile1.mqcdn.com/tiles/1.0.0/sat/"
 			maximumLevel: 11
 		
+		"""
 		ortopic = new Cesium.OpenStreetMapImageryProvider
-			url: 'http://tiles.kartat.kapsi.fi/ortokuva/'
+			#url: 'http://tiles.kartat.kapsi.fi/ortokuva/'
+			url: 'http://144.76.26.165/geoserver/gwc/service/tms/1.0.0/hel:orto2012@EPSG:900913@jpeg/'
 			maximumLevel: 19
 			tileDiscardPolicy: new MinzoomlevelDiscard 13
+		"""
 
 			
 		###
@@ -517,14 +523,11 @@ class CesiumFactory
 			token: "e7DdYy9h9Ry2aq19iaddyq63YadpSwWw7fTpMGky6RmpAT_jX4YbH4qTeR5fxJRzTJ63I0xhJuaCZZNjIReeZQ"
 		###
 		
-		###
 		ortopic = new Cesium.WebMapServiceImageryProvider
-			url: "http://tiles.kartat.kapsi.fi/ortokuva?"
-			layers: "ortokuva"
+			url: 'http://144.76.26.165/geoserver/gwc/service/wms/'
+			layers: 'hel:orto2012'
 			parameters:
 				format: "image/png"
-			tileDiscardPolicy: new OrtopicDiscard
-		###
 
 		widget = new Cesium.CesiumWidget @el
 
