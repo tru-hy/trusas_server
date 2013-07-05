@@ -50,18 +50,19 @@ def point_diff(latlon1, latlon2):
 
 class GpxProvider(providers.PathProvider):
 	def __init__(self, mypath, gpxfile,
-		content_type="application/vnd.trusas.location"):
+		content_type="application/jsons; trusas_type=location"):
 		self.gpxfile = gpxfile
 		self.data = None
 		super(GpxProvider, self).__init__(mypath, content_type)
 	
 	def handle(self, **kwargs):
 		track = gpx_to_track(self.gpxfile.read())
+		print len(track)
 		track = smooth_track(track)
+		print len(track)
 		self.gpxfile.seek(0)
 
 		output = StringIO()
-		print "Got track"
 		
 		for i, point in enumerate(track):
 			hdr = dict(ts=point['ts'])
@@ -127,4 +128,4 @@ if __name__ == '__main__':
 	import sys
 	import session_server
 
-	session_server.run_with_providers([GpxProvider("location2.jsons", open(sys.argv[1]))])
+	session_server.run_with_providers([GpxProvider("location.jsons", open(sys.argv[1]))])

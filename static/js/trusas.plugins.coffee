@@ -8,10 +8,10 @@ tp.defaults = []
 class VideoWidget
 	@Load: (controller, register, param) =>
 		{uri, type, getcontainer} = param
-		return if type._type != 'video'
+		return if type.type != 'video'
 		if not resources
-			resources = 'resources.json'
-		return if not timemap_uri = type.timemap
+			resources = 'resources/index.json'
+		return if not timemap_uri = type.param.timemap
 		
 		register_widget = (param, timemap, parent) =>
 			try

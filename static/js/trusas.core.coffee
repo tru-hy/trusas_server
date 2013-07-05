@@ -18,7 +18,12 @@ class _Lazycall
 @dcall = (func, timeout=300) ->
 	handler = new _Lazycall func, timeout
 	return handler.schedule
-	
+
+parse_basepath = (url) ->
+	i = url.lastIndexOf '/'
+	if i < 0
+		return ''
+	return url[0..i]
 
 @new_trusas_controller = (opts) ->
 	{success, getcontainer, error, complete, resources,
@@ -28,9 +33,9 @@ class _Lazycall
 	ctrl = new TrusasController()
 	
 	if not resources
-		resources = 'resources.json'
+		resources = 'resources/index.json'
 	
-	load_handlers = (complete, resources, oncreated, getcontainer) =>
+	load_handlers = (complete, basepath, resources, oncreated, getcontainer) =>
 		loading = []
 		loaded = []
 		handlers_notified = false
@@ -65,22 +70,33 @@ class _Lazycall
 		for handler in handlers
 			for uri of resources
 				type = mime_parse resources[uri]
+				if basepath
+					access_uri = basepath + uri
+				else
+					access_uri = uri
 				param =
-					uri: uri, type: type, handler: handler,
-					getcontainer: getcontainer
+					uri: access_uri, type: type, handler: handler,
+					getcontainer: getcontainer,
+					raw_uri: uri, basepath: basepath
 
 				if handler ctrl, registerer(param), param
 					loading.push param
 		
 		handlers_notified = true
 		notify_if_complete()
-
-  
-	loader = (resources) => load_handlers(complete, resources, oncreated, getcontainer)
+	
+	if typeof(resources) == 'string'
+		basepath = parse_basepath resources
+	else
+		basepath = ''
+	
+	loader = (resources) =>
+		load_handlers(complete, basepath, resources, oncreated, getcontainer)
+	
 	if typeof(resources) == 'string'
 		$.getJSON resources, loader
 	else
-	  loader resources
+		loader resources
 	return ctrl
 
 class @TrusasCursorPlayer
@@ -315,6 +331,7 @@ getJsonStream = (uri, success, opts={}) ->
 	# TODO: Really stream
 	opts.success = (data, args...) ->
 		success json_stream_to_flat_array(data), args...
+	opts.dataType = "text"
 	$.ajax uri, opts
 
 json_stream_to_flat_array = (stream) ->
@@ -336,10 +353,17 @@ class WidgetError extends Error
 mime_parse = (mime) ->
 	[type, opts...] = mime.split ';'
 	r = {}
+	param = {}
 	for opt in opts
-	  [name, value] = opt.split '=', 2
-		r[name.trim()] = value if name
+		[name, value] = opt.split '=', 2
+		name = name.trim()
+		value = value.trim()
+		if value
+			param[name] = value if name
+		else
+			param[name] = true
 	
-	[r._type, r._subtype] = (v.trim() for v in type.split '/', 2)
+	r.param = param
+	[r.type, r.subtype] = (v.trim() for v in type.split '/', 2)
 	return r
 

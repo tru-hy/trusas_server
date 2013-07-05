@@ -22,19 +22,19 @@ def _prober_video(f, d):
 
 def _prober_location(f, d):
 	_basename_filter('location.jsons', f)
-	yield FileProvider(f, 'application/vnd.trusas.location')
+	yield FileProvider(f, 'application/jsons; trusas_type=location')
 
 def _prober_androidlocation(f, d):
 	_basename_filter('location_android.jsons', f)
-	yield FileProvider(f, 'application/vnd.trusas.android-location')
+	yield FileProvider(f, 'application/jsons; trusas_type=android-location')
 
 def _prober_smarteye(f, d):
 	_basename_filter('smarteye.jsons', f)
-	yield FileProvider(f, 'application/vnd.trusas.tru.smarteye')
+	yield FileProvider(f, 'application/jsons; trusas_type=tru.smarteye')
 
 def _prober_sensors(f, d):
 	_basename_filter('sensors.jsons', f)
-	yield FileProvider(f, 'application/vnd.trusas.sensors')
+	yield FileProvider(f, 'application/jsons; trusas_type=sensors')
 
 
 

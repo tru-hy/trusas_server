@@ -5,7 +5,7 @@ extras = []
 
 extras.push tp.map
 	typefilter: (type) ->
-		type._subtype == 'vnd.trusas.location'
+		type.param.trusas_type == 'location'
 	cursor: ts_cursor
 	axis: '_ts'
 
@@ -16,16 +16,15 @@ extras.push tp.streetview
 	cursor: ts_cursor
 	axis: '_ts'
 ###
-
 extras.push tp.cesium
 	typefilter: (type) ->
-		type._subtype == 'vnd.trusas.location'
+		type.param.trusas_type == 'location'
 	cursor: ts_cursor
 	axis: '_ts'
 
 extras.push tp.signal_plotter
 	typefilter: (type) ->
-		type._subtype == 'vnd.trusas.location'
+		type.param.trusas_type == 'location'
 	cursor: ts_cursor
 	axis: '_ts'
 	field: 'speed'
@@ -36,7 +35,7 @@ extras.push tp.signal_plotter
 
 extras.push tp.signal_plotter
 	typefilter: (type) ->
-		type._subtype == 'vnd.trusas.location'
+		type.param.trusas_type == 'location'
 	cursor: ts_cursor
 	axis: '_ts'
 	field: 'elevation'
@@ -46,7 +45,7 @@ extras.push tp.signal_plotter
 	
 g_heading = tp.signal_plotter
 	typefilter: (type) ->
-		type._subtype == 'vnd.trusas.tru.smarteye'
+		type.param.trusas_type == 'tru.smarteye'
 	field: 'g_est_heading'
 	drawPoints: true
 	strokeWidth: 0.0
@@ -54,7 +53,7 @@ extras.push g_heading
 
 g_yaw_rate = tp.signal_plotter
 	typefilter: (type) ->
-		type._subtype == 'vnd.trusas.sensors'
+		type.param.trusas_type == 'sensors'
 	field: 'rot_rate_z'
 	drawPoints: false
 extras.push g_yaw_rate

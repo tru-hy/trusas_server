@@ -9,9 +9,9 @@ def is_fileobject(obj):
 	return has('read') and has('seek')
 
 DEFAULT_STATIC_PATH = path.join(path.dirname('__file__'), 'static')
-class SessionServer(object):
-	def __init__(self, providers, static_path=DEFAULT_STATIC_PATH):
-		self.providers = providers
+
+class StaticServer(object):
+	def __init__(self, static_path=DEFAULT_STATIC_PATH):
 		self.static_path = path.abspath(static_path)
 	
 	@cp.expose
@@ -20,14 +20,59 @@ class SessionServer(object):
 			path = ['index.html']
 		
 		path = os.path.join(*path)
-		print "Serving", path
+		return self.serve_static(path)
+	
+	def serve_static(self, path):
+		path = os.path.abspath(os.path.join(self.static_path, path))
+		# TODO: I wish there's a more standard implementation for this
+		if not path.startswith(self.static_path):
+			raise cp.HTTPError(400, "Bad Request. I'm on to you and your slashes and dots!")
+		print path
+		return serve_file(path)
+
+
+
+	
+	"""
+	@cp.expose
+	def default(self, *path, **kwargs):
+		if len(path) == 0:
+			path = ['index.html']
+		
+		path = os.path.join(*path)
+		return self.serve_static(path)
+	
+	def serve_static(self, path):
+		path = os.path.abspath(os.path.join(self.static_path, path))
+		# TODO: I wish there's a more standard implementation for this
+		if not path.startswith(self.static_path):
+			raise cp.HTTPError(400, "Bad Request. I'm on to you and your slashes and dots!")
+		print path
+		return serve_file(path)
+	"""
+
+class ResourceServer(object):
+	def __init__(self, providers):
+		self.providers = providers
+	
+	@cp.tools.json_out()
+	def index_json(self):
+		res = {}
+		for provider in self.providers[::-1]:
+			res.update(provider.provides())
+		return res
+	cp.expose(index_json, 'index')
+
+	@cp.expose
+	def default(self, *path, **kwargs):
+		path = os.path.join(*path)
 		for provider in self.providers:
 			result = provider(path=path, **kwargs)
 			if result is not None:
 				return self._serve_result(result)
 
-		return self.serve_static(path)
-	
+		raise cp.NotFound()
+
 	def _serve_result(self, result):
 		hdr, data = result
 		cp.response.headers['Content-Type'] = hdr['Content-Type']
@@ -37,30 +82,22 @@ class SessionServer(object):
 			return serve_fileobj(data)
 		
 
-	@cp.expose
-	@cp.tools.json_out()
-	def resources_json(self):
-		res = {}
-		for provider in self.providers[::-1]:
-			res.update(provider.provides())
-		return res
+class RootServer(object):
+	def __init__(self, providers, static_path=DEFAULT_STATIC_PATH):
+		self.static = StaticServer(static_path)
+		self.resources = ResourceServer(providers)
 	
-	def serve_static(self, path):
-		path = os.path.abspath(os.path.join(self.static_path, path))
-		# TODO: I wish there's a more standard implementation for this
-		if not path.startswith(self.static_path):
-			raise cp.HTTPError(400, "Bad Request. I'm on to you and your slashes and dots!")
-		return serve_file(path)
+	@cp.expose
+	def index(self):
+		return self.static.serve_static('index.html')
+	
 
 cp_global_config = {
 	'server.socket_host': '0.0.0.0',
-	'server.thread_pool': 100,
-	'tools.sessions.locking': 'explicit'}
-
-cp_app_config = {'/': {
-	'tools.staticdir.on': True,
-	'tools.staticdir.dir': path.abspath(DEFAULT_STATIC_PATH)}
+	'server.thread_pool': 10,
 	}
+
+cp_app_config = {}
 		
 
 class Lister:
@@ -104,7 +141,7 @@ def run_dir_prober(directory, prober):
 	cp.engine.block()
 
 def run_with_providers(providers):
-	cp.quickstart(SessionServer(providers), '/',
+	cp.quickstart(RootServer(providers), '/',
 		config={'global': cp_global_config})
 
 if __name__ == '__main__':
@@ -115,3 +152,4 @@ if __name__ == '__main__':
 	provs = providers.passthrough_providers(resources,
 			os.path.dirname(sys.argv[1]))
 	run_with_providers(provs)
+
