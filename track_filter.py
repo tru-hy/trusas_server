@@ -3,8 +3,6 @@ import scipy.stats
 import scipy.interpolate
 import pyproj
 
-from numba import autojit
-
 class VehicleParticleFilter:
 	def __init__(self,
 			init_positions,
