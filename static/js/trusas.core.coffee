@@ -9,8 +9,6 @@ class _Lazycall
 			@pending = args
 			return
 		@pending = args
-		console.log "Scheduling"
-		console.log @handle
 		setTimeout @_handle, @timeout
 	
 	_handle: =>
