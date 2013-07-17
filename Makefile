@@ -1,4 +1,4 @@
-sourcefiles := $(wildcard static/js/*.coffee)
+sourcefiles := $(wildcard static/static/js/*.coffee)
 targetfiles := $(sourcefiles:.coffee=.js)
 
 

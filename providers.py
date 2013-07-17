@@ -4,6 +4,7 @@ from copy import copy
 import os
 import json
 import time
+from collections import Mapping
 
 def add_content_type_param(ct, param):
 	return "%s; %s"%(ct, param)
@@ -21,9 +22,9 @@ class PathProvider(object):
 			return None
 
 		return ({'Content-Type': self.content_type},
-			self.handle(path=path, **kwargs))
+			self.handle(**kwargs))
 	
-	def handle(self, path, **kwargs):
+	def handle(self, **kwargs):
 		raise NotImplemented
 
 class FileProvider(PathProvider):

@@ -1,6 +1,5 @@
 import cherrypy as cp
 import os
-from os import path
 from cherrypy.lib.static import serve_file, serve_fileobj
 
 
@@ -8,7 +7,7 @@ def is_fileobject(obj):
 	has = lambda attr: hasattr(obj, attr) and callable(getattr(obj, attr))
 	return has('read') and has('seek')
 
-DEFAULT_STATIC_PATH = path.join(path.dirname('__file__'), 'static')
+DEFAULT_STATIC_PATH = os.path.join(os.path.dirname(__file__), 'static')
 
 class StaticServer(object):
 	def __init__(self, static_path=DEFAULT_STATIC_PATH):
@@ -27,29 +26,7 @@ class StaticServer(object):
 		# TODO: I wish there's a more standard implementation for this
 		if not path.startswith(self.static_path):
 			raise cp.HTTPError(400, "Bad Request. I'm on to you and your slashes and dots!")
-		print path
 		return serve_file(path)
-
-
-
-	
-	"""
-	@cp.expose
-	def default(self, *path, **kwargs):
-		if len(path) == 0:
-			path = ['index.html']
-		
-		path = os.path.join(*path)
-		return self.serve_static(path)
-	
-	def serve_static(self, path):
-		path = os.path.abspath(os.path.join(self.static_path, path))
-		# TODO: I wish there's a more standard implementation for this
-		if not path.startswith(self.static_path):
-			raise cp.HTTPError(400, "Bad Request. I'm on to you and your slashes and dots!")
-		print path
-		return serve_file(path)
-	"""
 
 class ResourceServer(object):
 	def __init__(self, providers):
@@ -90,7 +67,37 @@ class RootServer(object):
 	@cp.expose
 	def index(self):
 		return self.static.serve_static('index.html')
+
+class StaticUnderlayServer(object):
+	def __init__(self, staticdirs, defaults=[DEFAULT_STATIC_PATH]):
+		self._staticdirs = map(os.path.abspath, [staticdirs]+defaults)
 	
+	@cp.expose
+	def default(self, *path, **kwargs):
+		if len(path) == 0:
+			path = ['index.html']
+		path = os.path.join(*path)
+		for root in self._staticdirs:
+			result = self._serve_static(path, root)
+			if result is not None:
+				return result
+		raise cp.NotFound()
+
+	def _serve_static(self, path, root):
+		path = os.path.abspath(os.path.join(root, path))
+		if not path.startswith(root):
+			return
+		
+		# May be rather stupid?
+		try:
+			fileobj = open(path, 'r')
+		except IOError:
+			return
+		fileobj.close()
+
+		return serve_file(path)
+		
+		
 
 cp_global_config = {
 	'server.socket_host': '0.0.0.0',
