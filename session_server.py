@@ -5,7 +5,8 @@ from cherrypy.lib.static import serve_file, serve_fileobj
 
 def is_fileobject(obj):
 	has = lambda attr: hasattr(obj, attr) and callable(getattr(obj, attr))
-	return has('read') and has('seek')
+	return has('read')
+	#return has('read') and has('seek')
 
 DEFAULT_STATIC_PATH = os.path.join(os.path.dirname(__file__), 'static')
 
@@ -39,24 +40,27 @@ class ResourceServer(object):
 			res.update(provider.provides())
 		return res
 	cp.expose(index_json, 'index')
-
+	
 	@cp.expose
 	def default(self, *path, **kwargs):
-		path = os.path.join(*path)
 		for provider in self.providers:
-			result = provider(path=path, **kwargs)
+			print provider
+			result = provider(*path, **kwargs)
 			if result is not None:
 				return self._serve_result(result)
 
 		raise cp.NotFound()
+	default._cp_config = {'response.stream': True}
 
 	def _serve_result(self, result):
 		hdr, data = result
 		cp.response.headers['Content-Type'] = hdr['Content-Type']
 		if isinstance(data, basestring):
-			return serve_file(data)
+			return data
 		if is_fileobject(data):
 			return serve_fileobj(data)
+		if isinstance(data, FileResult):
+			return serve_file(data.path)
 		
 
 class RootServer(object):

@@ -9,6 +9,10 @@ from collections import Mapping
 def add_content_type_param(ct, param):
 	return "%s; %s"%(ct, param)
 
+class FileResult:
+	def __init__(self, path):
+		self.path = path
+
 class PathProvider(object):
 	def __init__(self, mypath, content_type):
 		self.mypath = mypath
@@ -17,8 +21,8 @@ class PathProvider(object):
 	def provides(self):
 		return {self.mypath: self.content_type}
 
-	def __call__(self, path, **kwargs):
-		if path != self.mypath:
+	def __call__(self, *path, **kwargs):
+		if path[0] != self.mypath:
 			return None
 
 		return ({'Content-Type': self.content_type},
@@ -47,7 +51,7 @@ class FileProvider(PathProvider):
 		super(FileProvider, self).__init__(provides, content_type)
 	
 	def handle(self, **kwargs):
-		return os.path.abspath(self.filepath)
+		return FileResult(os.path.abspath(self.filepath))
 
 class AuxProvider(object):
 	def __init__(self, provider, *aux_providers):
