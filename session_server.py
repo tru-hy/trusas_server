@@ -44,7 +44,6 @@ class ResourceServer(object):
 	@cp.expose
 	def default(self, *path, **kwargs):
 		for provider in self.providers:
-			print provider
 			result = provider(*path, **kwargs)
 			if result is not None:
 				return self._serve_result(result)
