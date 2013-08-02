@@ -14,10 +14,13 @@ class Trusas.PolymapsMap
 		.add(po.interact())
 		.zoomRange(null)
 		
-		osmurl = po.url("http://{S}www.toolserver.org/tiles/bw-mapnik/{Z}/{X}/{Y}.png")
-		.hosts(['a.', 'b.'])
-		#osmurl = po.url("http://tile.openstreetmap.org/{Z}/{X}/{Y}.png")
-		@map.add(po.image().url(osmurl))
+		#osmurl = po.url("http://{S}www.toolserver.org/tiles/bw-mapnik/{Z}/{X}/{Y}.png")
+		#.hosts(['a.', 'b.'])
+		osmurl = po.url("http://tile.openstreetmap.org/{Z}/{X}/{Y}.png")
+		osmlayer = po.image().url(osmurl)
+		.zoom((z) -> Math.min(z, 18))
+
+		@map.add(osmlayer)
 
 		
 		layer = svg.appendChild(po.svg 'g')
