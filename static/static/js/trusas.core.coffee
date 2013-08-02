@@ -206,7 +206,7 @@ Trusas.coords_extent = (coords) ->
 		else if c[1] > maxlon
 			maxlon = c[1]
 	
-	return [minlon, minlat, maxlon, maxlat]
+	return [[minlat, minlon], [maxlat, maxlon]]
 
 Trusas.radians = (deg) -> deg*(Math.PI/180)
 
