@@ -25,12 +25,22 @@ class Trusas.PolymapsMap
 		
 		layer = svg.appendChild(po.svg 'g')
 		marker = layer.appendChild(po.svg 'circle')
-		@hoverpos = [0, 0]
-		@hovermarker = $(marker)
+		@_hoverpos = [0, 0]
+		@_hovermarker = $(marker)
 		.attr("r", 10)
 		.attr("display", "none")
-
 		@map.on "move", @_render_hover
+		
+		layer = svg.appendChild(po.svg 'g')
+		marker = layer.appendChild(po.svg 'path')
+		@_activepath = []
+		@_activepath_el = $(marker)
+		.attr("stroke-width", 10)
+		.attr("fill", "none")
+		.attr("display", "none")
+		.attr("stroke", "black")
+		.attr("vector-effect", "non-scaling-stroke")
+		@map.on "move", @_render_activepath
 
 		@ready = $.Deferred()
 		@ready.resolve(@)
@@ -76,23 +86,42 @@ class Trusas.PolymapsMap
 
 	
 	set_hover: (pos) =>
-		# TODO: This isn't probably the most efficient, but
-		#	I couldn't figure out how to make the stylist
-		#	to give out the created element.
-		@hoverpos = pos
+		@_hoverpos = pos
 		@_render_hover()
 	
 	_render_hover: =>
-		pos = @hoverpos
+		pos = @_hoverpos
 		if not pos or not pos[0]
-			@hovermarker.attr("display", "none")
+			@_hovermarker.attr("display", "none")
 			return
 		
 		p = @map.locationPoint lat: pos[0], lon: pos[1]
 		trans = "translate(#{p.x}, #{p.y})"
-		@hovermarker.attr("transform", trans)
-		@hovermarker.attr("display", "inline")
+		@_hovermarker.attr("transform", trans)
+		@_hovermarker.attr("display", "inline")
+
 	
+	set_active_path: (coords) =>
+		@_activepath = coords
+		@_render_activepath()
+	
+	_render_activepath: =>
+		if @_activepath.length == 0
+			@_activepath_el.attr("display", "none")
+			return
+		
+		# TODO: Clipping would probably be faster
+		line = d3.svg.line()
+		.x((d) -> d.x)
+		.y((d) -> d.y)
+		mapped = []
+		for p in @_activepath
+			mapped.push @map.locationPoint(lat: p[0], lon: p[1])
+		d = line(mapped)
+		@_activepath_el.attr("d", d)
+		@_activepath_el.attr("display", "inline")
+	
+		
 	onmove: (cb) =>
 		@map.on "move", =>
 			# Don't signal on "synthetic" (self-triggered)
@@ -107,10 +136,8 @@ class Trusas.PolymapsMap
 
 Trusas.Map = Trusas.PolymapsMap
 
-###
-TODO: Fix me
 `
-// Shameless copypaste from wikipedia
+// Adapted from C++ code in wikipedia Cohen-Shuterland page
 INSIDE = 0; // 0000
 LEFT = 1;   // 0001
 RIGHT = 2;  // 0010
@@ -154,10 +181,12 @@ ComputeOutCode = function(x, y)
 	var outcode0 = ComputeOutCode(x0, y0);
 	var outcode1 = ComputeOutCode(x1, y1);
 	var accept = false;
+	var full = false;
  
 	while (true) {
 		if (!(outcode0 | outcode1)) { // Bitwise OR is 0. Trivially accept and get out of loop
 			accept = true;
+			full = true;
 			break;
 		} else if (outcode0 & outcode1) { // Bitwise AND is not 0. Trivially reject and get out of loop
 			break;
@@ -200,25 +229,63 @@ ComputeOutCode = function(x, y)
 	}
 
 	if(!accept) {
-		return false;
+		return [false, false];
 	}
 
-	return [x0, y0, x1, y1];
+	return [[[x0, y0], [x1, y1]], full];
 }
 `
+
+t_at_point = (p, span) ->
+	[[x0, y0], [x1, y1]] = span
+	spanlen = Math.sqrt(Math.pow(x0-x1, 2) + Math.pow(y0-y1, 2))
+	projlen = Math.sqrt(Math.pow(p[0]-x0, 2) + Math.pow(p[1]-y0, 2))
+	return projlen/spanlen
+
+clipped_distspan = (bbox, c0, c1, dists) ->
+	[clipped, isfull] = CohenSutherlandLineClip(c0[0], c0[1], c1[0], c1[1], bbox)
+	return false if not clipped
+	dist = dists[1] - dists[0]
+	a = t_at_point(clipped[0], [c0, c1])*dist+dists[0]
+	b = t_at_point(clipped[1], [c0, c1])*dist+dists[0]
+	return [a, b]
 
 
 Trusas.clipped_linestrings = (bbox, coords, dists) ->
 	inside = []
-	for i in [1...coords.length-1]
+	i = 0
+	n = coords.length-1
+	while i < n
 		c0 = coords[i]
 		c1 = coords[i+1]
-		clipped = CohenSutherlandLineClip(c0[0], c0[1], c1[0], c1[1], bbox)
-		if clipped
-			inside.push [i, i+1]
-
+		clipped = clipped_distspan bbox, c0, c1, [dists[i], dists[i+1]]
+		if not clipped
+			++i; continue
+		current = clipped
+		inside.push(current); ++i
+		while i < n
+			c0 = coords[i]
+			c1 = coords[i+1]
+			clipped = clipped_distspan bbox, c0, c1, [dists[i], dists[i+1]]
+			if clipped[0] != dists[i] # New non-continuous span
+				# TODO Does a recalc of the clipped to simplify flow
+				break
+			current[1] = clipped[1]
+			++i
 	return inside
-###
+
+Trusas.longest_clipped_linestring = (bbox, coords, dists) ->
+	inside = Trusas.clipped_linestrings bbox, coords, dists
+	maxlen = -1
+	maxspan = [NaN, NaN]
+	for span in inside
+		slen = span[1] - span[0]
+		if slen > maxlen
+			maxlen = slen
+			maxspan = span
+	return maxspan
+
+	
 
 ###
 class Trusas.CesiumMap
