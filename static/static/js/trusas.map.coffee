@@ -41,6 +41,10 @@ class Trusas.PolymapsMap
 		.attr("stroke", "black")
 		.attr("vector-effect", "non-scaling-stroke")
 		@map.on "move", @_render_activepath
+		
+		@_route_layer = d3.select svg.appendChild(po.svg 'g')
+		@_colored_routes = []
+		@map.on "move", @_render_colored_routes
 
 		@ready = $.Deferred()
 		@ready.resolve(@)
@@ -60,6 +64,14 @@ class Trusas.PolymapsMap
 
 		layer.on "load", style
 		@map.add(layer)
+	
+	add_colored_route: (coords, valuemap, resolution, id) =>
+		el = @_route_layer.append "g"
+		@_colored_routes.push
+			coords: coords
+			valuemap: valuemap
+			element: el
+			resolution: resolution
 
 	add_marker: (coords, id) =>
 		geo = geometry:
@@ -71,8 +83,10 @@ class Trusas.PolymapsMap
 		style = po.stylist()
 		
 		layer.on "load", style
-		.attr("r", 5)
-		.attr("fill", "red")
+		.attr("r", 7)
+		.attr("stroke", "black")
+		.attr("stroke-width", 2)
+		.attr("fill", "none")
 		.attr("vector-effect", "non-scaling-stroke")
 
 		@map.add(layer)
@@ -121,6 +135,38 @@ class Trusas.PolymapsMap
 		@_activepath_el.attr("d", d)
 		@_activepath_el.attr("display", "inline")
 	
+	_render_colored_routes: =>
+		for route in @_colored_routes
+			line = d3.svg.line()
+			.x((d) -> d.x)
+			.y((d) -> d.y)
+			mapped = []
+			for p in route.coords
+				mapped.push @map.locationPoint(lat: p[0], lon: p[1])
+			
+			route.element.selectAll("path").remove()
+			d = line(mapped)
+			#color = d3.interpolateLab("#008000", "#c83a22")
+			color = d3.interpolateLab("red", "green")
+			
+			valuemap = route.valuemap
+			sampled = sample(d, route.resolution)
+			route.element.selectAll("path")
+			.data(quad(sampled))
+			.enter().append("path")
+			.style("fill", (d) -> color(valuemap(d.t)))
+			.style("stroke", (d) -> color(valuemap(d.t)))
+			.attr("d", (d) -> lineJoin(d[0], d[1], d[2], d[3], 5))
+			
+			###
+			route.element.append("path")
+			.attr('d', d)
+			.attr("fill", "none")
+			.attr("stroke", "steelblue")
+			.attr("stroke-width", 5)
+			.attr("vector-effect", "non-scaling-stroke")
+			###
+	
 		
 	onmove: (cb) =>
 		@map.on "move", =>
@@ -137,6 +183,117 @@ class Trusas.PolymapsMap
 Trusas.Map = Trusas.PolymapsMap
 
 `
+// Adapted from https://gist.github.com/mbostock/4163057
+// Sample the SVG path string "d" uniformly with the specified precision.
+function sample(d, precision) {
+  var path = document.createElementNS(d3.ns.prefix.svg, "path");
+  path.setAttribute("d", d);
+  
+  var len = path.getTotalLength();
+  var segs = path.pathSegList;
+  var coords = [];
+  var prevseg = null;
+  for(var i=0; i < segs.numberOfItems; ++i) {
+    var seg = segs.getItem(i);
+    var a = [seg.x, seg.y];
+    if(prevseg === null) {
+      a.t = 0.0;
+      coords.push(a);
+      prevseg = a;
+    } else {
+      var seglen = Math.sqrt(
+      		Math.pow(a[0] - prevseg[0], 2) +
+		Math.pow(a[1] - prevseg[1], 2));
+      a.t = prevseg.t + seglen/len;
+      // Numerical errors cause this
+      if(a.t > 1.0) {
+        a.t = 1.0;
+      }
+
+      if(Math.abs(prevseg.t - a.t) < 1e-6){
+        continue;
+      }
+      
+      for(var t = prevseg.t+precision; t < a.t; t += precision) {
+         var pos = path.getPointAtLength(t*len);
+         var mida = [pos.x, pos.y];
+	 mida.t = t;
+	 coords.push(mida);
+      }
+    }
+
+    prevseg = a;
+    coords.push(a);
+  }
+
+  return coords;
+
+
+  
+  var n = path.getTotalLength(), t = [0], i = 0, dt = precision;
+  while ((i += dt) < n) t.push(i);
+  t.push(n);
+ 
+  return t.map(function(t) {
+    var p = path.getPointAtLength(t), a = [p.x, p.y];
+    a.t = t / n;
+    return a;
+  });
+}
+ 
+// Compute quads of adjacent points [p0, p1, p2, p3].
+function quad(points) {
+  return d3.range(points.length - 1).map(function(i) {
+    var a = [points[i - 1], points[i], points[i + 1], points[i + 2]];
+    a.t = (points[i].t + points[i + 1].t) / 2;
+    return a;
+  });
+}
+ 
+// Compute stroke outline for segment p12.
+function lineJoin(p0, p1, p2, p3, width) {
+  var u12 = perp(p1, p2),
+      r = width / 2,
+      a = [p1[0] + u12[0] * r, p1[1] + u12[1] * r],
+      b = [p2[0] + u12[0] * r, p2[1] + u12[1] * r],
+      c = [p2[0] - u12[0] * r, p2[1] - u12[1] * r],
+      d = [p1[0] - u12[0] * r, p1[1] - u12[1] * r];
+ 
+  if (p0) { // clip ad and dc using average of u01 and u12
+    var u01 = perp(p0, p1), e = [p1[0] + u01[0] + u12[0], p1[1] + u01[1] + u12[1]];
+    a = lineIntersect(p1, e, a, b);
+    d = lineIntersect(p1, e, d, c);
+  }
+ 
+  if (p3) { // clip ab and dc using average of u12 and u23
+    var u23 = perp(p2, p3), e = [p2[0] + u23[0] + u12[0], p2[1] + u23[1] + u12[1]];
+    b = lineIntersect(p2, e, a, b);
+    c = lineIntersect(p2, e, d, c);
+  }
+  
+  if(a[0] != a[0] || b[0] != b[0] || c[0] != c[0] || d[0] != d[0]) {
+    return null;
+  }
+  return "M" + a + "L" + b + " " + c + " " + d + "Z";
+}
+ 
+// Compute intersection of two infinite lines ab and cd.
+function lineIntersect(a, b, c, d) {
+  var x1 = c[0], x3 = a[0], x21 = d[0] - x1, x43 = b[0] - x3,
+      y1 = c[1], y3 = a[1], y21 = d[1] - y1, y43 = b[1] - y3,
+      ua = (x43 * (y1 - y3) - y43 * (x1 - x3)) / (y43 * x21 - x43 * y21);
+  return [x1 + ua * x21, y1 + ua * y21];
+}
+ 
+// Compute unit vector perpendicular to p01.
+function perp(p0, p1) {
+  var u01x = p0[1] - p1[1], u01y = p1[0] - p0[0],
+      u01d = Math.sqrt(u01x * u01x + u01y * u01y);
+  return [u01x / u01d, u01y / u01d];
+}
+`
+
+`
 // Adapted from C++ code in wikipedia Cohen-Shuterland page
 INSIDE = 0; // 0000
 LEFT = 1;   // 0001
@@ -146,8 +303,6 @@ TOP = 8;    // 1000
  
 // Compute the bit code for a point (x, y) using the clip rectangle
 // bounded diagonally by (xmin, ymin), and (xmax, ymax)
- 
-// ASSUME THAT xmax, xmin, ymax and ymin are global constants.
  
 // Cohen-Sutherland clipping algorithm clips a line from
 // P0 = (x0, y0) to P1 = (x1, y1) against a rectangle with 
