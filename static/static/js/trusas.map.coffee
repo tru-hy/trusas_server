@@ -49,7 +49,7 @@ class Trusas.PolymapsMap
 		@ready = $.Deferred()
 		@ready.resolve(@)
 	
-	add_route: (coords, id) =>
+	add_route: (coords, id, styler=(style) -> style) =>
 		coords = ([c[1], c[0]] for c in coords)
 		geo = geometry:
 			type: "LineString"
@@ -61,9 +61,31 @@ class Trusas.PolymapsMap
 		.attr("stroke", "steelblue")
 		.attr("stroke-width", 5)
 		.attr("vector-effect", "non-scaling-stroke")
+		style = styler style
 
 		layer.on "load", style
 		@map.add(layer)
+	
+	add_points: (coords, ids, styler=((x) -> x), onload=((x) -> x)) =>
+		#coords = ([c[1], c[0]] for c in coords)
+		geo = []
+		for i in [0...coords.length]
+			c = coords[i]
+			c = [c[1], c[0]]
+			geo.push {
+				geometry:
+					type: "Point"
+					coordinates: c
+				id: ids[i]
+				}
+		
+		layer = po.geoJson().features(geo)
+		style = po.stylist()
+		style = styler(style)
+		layer.on "load", style
+		layer.on "load", onload
+		@map.add(layer)
+		return layer
 	
 	add_colored_route: (coords, valuemap, resolution, id) =>
 		el = @_route_layer.append "g"

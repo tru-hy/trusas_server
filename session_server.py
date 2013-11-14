@@ -1,7 +1,7 @@
 import cherrypy as cp
 import os
 from cherrypy.lib.static import serve_file, serve_fileobj
-
+from providers import FileResult
 
 def is_fileobject(obj):
 	has = lambda attr: hasattr(obj, attr) and callable(getattr(obj, attr))
