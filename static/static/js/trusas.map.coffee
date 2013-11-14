@@ -45,7 +45,8 @@ class Trusas.PolymapsMap
 		@_route_layer = d3.select svg.appendChild(po.svg 'g')
 		@_colored_routes = []
 		@map.on "move", @_render_colored_routes
-
+		
+		@_layers = {}
 		@ready = $.Deferred()
 		@ready.resolve(@)
 	
@@ -65,6 +66,13 @@ class Trusas.PolymapsMap
 
 		layer.on "load", style
 		@map.add(layer)
+		if id
+			@_layers[id] = layer
+	
+	remove_layer: (id) =>
+		return if id not of @_layers
+		@map.remove(@_layers[id])
+		delete @_layers[id]
 	
 	add_points: (coords, ids, styler=((x) -> x), onload=((x) -> x)) =>
 		#coords = ([c[1], c[0]] for c in coords)
