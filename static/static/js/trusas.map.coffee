@@ -1,5 +1,35 @@
 po = org.polymaps
 
+class PointLayer
+	constructor: (@map, points) ->
+		@element = @map.svg.appendChild(po.svg 'g')
+		$(@element).attr "class", "point_layer"
+		@points = points
+		
+		d3.select(@element)
+		.selectAll('circle')
+		.data(points)
+		.enter()
+		.append('circle')
+		.attr('id', (d) -> d.id)
+		
+		@reposition()
+		@map.map.on "move", @reposition
+		
+	reposition: =>
+		map = @map.map
+		translator = (point) ->
+			p = map.locationPoint point
+			return "translate(#{p.x}, #{p.y})"
+
+		d3.select(@element)
+		.selectAll('circle')
+		.attr('transform', translator)
+	
+
+# TODO: The abstraction leaks badly, and
+# isn't necessarily very good anyway
+# FIXME: Get rid of the polymaps tiled layer crap altogether
 class Trusas.PolymapsMap
 	@Create: (el) ->
 		self = new Trusas.PolymapsMap(el)
@@ -9,6 +39,7 @@ class Trusas.PolymapsMap
 		@_synthetic_move = false
 
 		svg = @el.appendChild(po.svg('svg'))
+		@svg = svg
 		@map = po.map()
 		.container(svg)
 		.add(po.interact())
@@ -74,26 +105,8 @@ class Trusas.PolymapsMap
 		@map.remove(@_layers[id])
 		delete @_layers[id]
 	
-	add_points: (coords, ids, styler=((x) -> x), onload=((x) -> x)) =>
-		#coords = ([c[1], c[0]] for c in coords)
-		geo = []
-		for i in [0...coords.length]
-			c = coords[i]
-			c = [c[1], c[0]]
-			geo.push {
-				geometry:
-					type: "Point"
-					coordinates: c
-				id: ids[i]
-				}
-		
-		layer = po.geoJson().features(geo)
-		style = po.stylist()
-		style = styler(style)
-		layer.on "load", style
-		layer.on "load", onload
-		@map.add(layer)
-		return layer
+	add_points: (points) =>
+		return new PointLayer(@,points)
 	
 	add_colored_route: (coords, valuemap, resolution, id) =>
 		el = @_route_layer.append "g"
