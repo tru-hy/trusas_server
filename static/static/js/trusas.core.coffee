@@ -5,17 +5,24 @@
 class _Lazycall
 	constructor: (@func, @timeout=300) ->
 		@pending = undefined
+		@embargo = false
 
 	schedule: (args...) =>
-		if @pending?
-			@pending = args
-			return
 		@pending = args
-		setTimeout @_handle, @timeout
+		return if @embargo
+		@_handle()
 	
+	_release_embargo: =>
+		@embargo = false
+		if @pending?
+			@_handle @pending
+
 	_handle: =>
-		@func @pending...
+		@embargo = true
+		args = @pending
 		@pending = undefined
+		@func args...
+		setTimeout @_release_embargo, @timeout
 		
 @dcall = (func, timeout=300) ->
 	handler = new _Lazycall func, timeout
