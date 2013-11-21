@@ -395,23 +395,38 @@ mime_parse = (mime) ->
 	[r.type, r.subtype] = (v.trim() for v in type.split '/', 2)
 	return r
 
-Trusas.searchsorted = searchsorted = (needle, haystack, base=0) ->
-	# Should really use interpolation search
-	# in our cases
-	len = haystack.length
-	if len <= 1
-		return base
-	mid_i = Math.floor(len/2)
-	mid_val = haystack[mid_i]
-	if needle < mid_val
-		return searchsorted(needle, haystack[0..mid_i-1], base)
-	return searchsorted(needle, haystack[mid_i..], mid_i+base)
+brutesearchsorted = (needle, haystack) ->
+	for i in [0...haystack.length]
+		if haystack[i] > needle
+			return i
+	
+	return haystack.length
+
+
+binarysearchsorted = (needle, haystack, minindex=0, maxindex=haystack.length-1) ->
+	return 0 if needle < haystack[0]
+	return haystack.length if needle > haystack[maxindex]
+	
+	while minindex <= maxindex
+		i = Math.floor((maxindex + minindex)/2)
+		val = haystack[i]
+		if needle > val
+			minindex = i + 1
+		else if needle < val
+			maxindex = i - 1
+		else
+			return i + 1
+	
+	return maxindex + 1
+		
+Trusas.searchsorted = searchsorted = binarysearchsorted
+
 	
 Trusas.interp1d = interp1d = (x, y) ->
 	interp = (new_x) ->
 		if new_x < x[0]
 			return NaN
-		prev_i = searchsorted(new_x, x)
+		prev_i = searchsorted(new_x, x)-1
 		ratio = (new_x - x[prev_i])/(x[prev_i+1] - x[prev_i])
 		return y[prev_i]*(1 - ratio) + y[prev_i + 1]*(ratio)
 	return interp
@@ -449,7 +464,7 @@ Trusas.rangepath = rangepath = (dists, lats, lons) ->
 		if end > dists[-1]
 			end = dists[-1]
 		
-		first = searchsorted(start, dists) + 1
+		first = searchsorted(start, dists)
 		last = searchsorted(end, dists)
 		start = coord_i(start)
 		end = coord_i(end)

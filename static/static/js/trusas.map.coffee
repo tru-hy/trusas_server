@@ -26,7 +26,6 @@ class PointLayer
 		.selectAll('circle')
 		.attr('transform', translator)
 	
-
 # TODO: The abstraction leaks badly, and
 # isn't necessarily very good anyway
 # FIXME: Get rid of the polymaps tiled layer crap altogether
@@ -197,8 +196,8 @@ class Trusas.PolymapsMap
 			route.element.selectAll("path")
 			.data(quad(sampled))
 			.enter().append("path")
-			.style("fill", (d) -> color(valuemap(d.t)))
-			.style("stroke", (d) -> color(valuemap(d.t)))
+			.style("fill", (d) -> color(valuemap(d.t + route.resolution)))
+			.style("stroke", (d) -> color(valuemap(d.t + route.resolution)))
 			.attr("d", (d) -> lineJoin(d[0], d[1], d[2], d[3], 5))
 			
 			###
