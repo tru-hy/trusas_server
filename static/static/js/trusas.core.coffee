@@ -185,8 +185,18 @@ class TrusasCursor
 	
 	setActiveRange: (range) =>
 		prev = @getActiveRange()
-		@_activeRange = range
+		new_range = range[..]
+		maxrange = @getAxisRange()
+		if new_range[0] < maxrange[0]
+			new_range[0] = maxrange[0]
+
+		if new_range[1] > maxrange[1]
+			new_range[1] = maxrange[1]
+		
+		# Works around undefineds
+		@_activeRange = new_range
 		new_range = @getActiveRange()
+
 		return if (prev[0] == new_range[0]) and
 			(prev[1] == new_range[1])
 
