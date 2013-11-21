@@ -455,6 +455,11 @@ Trusas.clipped_linestrings = (bbox, coords, dists) ->
 	while i < n
 		c0 = coords[i]
 		c1 = coords[i+1]
+
+		# Ignore duplicates
+		if dists[i] == dists[i+1]
+			++i; continue
+		
 		clipped = clipped_distspan bbox, c0, c1, [dists[i], dists[i+1]]
 		if not clipped
 			++i; continue
