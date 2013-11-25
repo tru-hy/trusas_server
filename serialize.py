@@ -1,4 +1,4 @@
-import simplejson
+import json
 from base64 import b64encode
 
 try:
@@ -61,14 +61,13 @@ def _encode_arrays(obj, mangled=None, path=None, root=None):
 	return root, mangled
 	
 		
-
 def dump(*args, **kwargs):
 	kwargs['default'] = object_mangler
-	return simplejson.dump(*args, default=object_mangler)
+	return json.dump(*args, **kwargs)
 
 def dumps(*args, **kwargs):
 	kwargs['default'] = object_mangler
-	return simplejson.dumps(*args, default=object_mangler)
+	return json.dumps(*args, **kwargs)
 
 def result(obj, **kwargs):
 	obj, mangling = _encode_arrays(obj)
