@@ -479,8 +479,8 @@ Trusas.rangepath = rangepath = (dists, lats, lons) ->
 		start = coord_i(start)
 		end = coord_i(end)
 		
-		plats = [start[0]].concat(lats[first..last]).concat([end[0]])
-		plons = [start[1]].concat(lons[first..last]).concat([end[1]])
+		plats = [start[0]].concat(lats[first..last-1]).concat([end[0]])
+		plons = [start[1]].concat(lons[first..last-1]).concat([end[1]])
 		coords = ([plats[i], plons[i]] for i in [0..(plats.length-1)])
 		# HACK!!! FIX THE SEARCHSORTED!!
 		last_i = coords.length - 1
